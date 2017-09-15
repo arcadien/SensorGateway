@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="4.0.3">
+ <item name="license">GPL</item>
+ <group name="locked"/>
+ <group name="settings">
+  <item name="tabs">1</item>
+  <item name="windows">0</item>
+  <item name="grid">1</item>
+  <item name="backups">0</item>
+ </group>
+ <group name="windows">
+  <item id=".::emitter_receiver_gateway.ino">-728,0,1172,651</item>
+  <item id="AOs::Radio433::SM">0,0,1172,651,*</item>
+ </group>
+ <group name="search">
+  <item name="options">1966592</item>
+  <item name="replace">0</item>
+ </group>
+ <group name="vars">
+  <item id="ARDUINO_SKETCHBOOK">D:\Utilisateurs\aurelien\Hubic\Arduino</item>
+  <item id="ARDUINO_HOME">C:\Program Files (x86)\Arduino</item>
+  <item id="BOARD_MCU">atmega328p</item>
+  <item id="BOARD_F_MHZ">8</item>
+  <item id="BOARD_COM">COM3</item>
+  <item id="BOARD_BAUD">57600</item>
+  <item id="BOARD_VARIANT">standard</item>
+  <item id="PROJECT">emitter_receiver_gateway</item>
+  <item id="BUILD_FLAGS">ARDUINO=101 __AVR_ATmega328P__</item>
+  <item id="DEPENDENCIES">qpn_avr</item>
+  <item id="BOARD_UART">115200</item>
+ </group>
+ <group name="tools">
+  <group name="tool">
+   <item name="icon">6</item>
+   <item name="title">Upload</item>
+   <item name="command">&quot;%ARDUINO_SKETCHBOOK%\tools\scripts\upload_avr.bat&quot;</item>
+   <item name="args">%PROJECT%</item>
+   <item name="dir">.</item>
+   <item name="options">2</item>
+  </group>
+  <group name="tool">
+   <item name="icon">3</item>
+   <item name="title">Build</item>
+   <item name="command">&quot;%ARDUINO_SKETCHBOOK%\tools\utils\tclsh.exe&quot;</item>
+   <item name="args">&quot;%ARDUINO_SKETCHBOOK%\tools\scripts\build_avr.tcl&quot; %PROJECT%  &quot;%DEPENDENCIES%&quot; &quot;%BUILD_FLAGS%&quot;</item>
+   <item name="dir">.</item>
+   <item name="options">3</item>
+  </group>
+  <group name="tool">
+   <item name="icon">5</item>
+   <item name="title">Clean</item>
+   <item name="command">&quot;%ARDUINO_SKETCHBOOK%\tools\utils\rm.exe&quot;</item>
+   <item name="args">bin\*</item>
+   <item name="dir">.</item>
+   <item name="options">2</item>
+  </group>
+  <group name="tool">
+   <item name="icon">5</item>
+   <item name="title">clean all</item>
+   <item name="command">&quot;%ARDUINO_SKETCHBOOK%\tools\utils\rm.exe&quot;</item>
+   <item name="args">bin\* lib\*</item>
+   <item name="dir"></item>
+   <item name="options">2</item>
+  </group>
+  <group name="tool">
+   <item name="icon">0</item>
+   <item name="title"></item>
+   <item name="command"></item>
+   <item name="args"></item>
+   <item name="dir"></item>
+   <item name="options">0</item>
+  </group>
+ </group>
+</session>
