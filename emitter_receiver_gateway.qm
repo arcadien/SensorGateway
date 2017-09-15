@@ -1,0 +1,1426 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<model version="4.0.3" links="0">
+ <framework name="qpn"/>
+ <package name="AOs" stereotype="0x02">
+  <class name="Led" superclass="qpn::QActive">
+   <attribute name="m_BlinkCounter" type="uint8_t" visibility="0x00" properties="0x00"/>
+   <attribute name="m_LedPin" type="uint8_t" visibility="0x00" properties="0x00"/>
+   <statechart>
+    <initial target="../1">
+     <initial_glyph conn="108,16,4,0,5">
+      <action box="-7,2,10,2"/>
+     </initial_glyph>
+    </initial>
+    <state name="READY">
+     <entry>Serial.print(F(&quot;LED driver for pin &quot;)); 
+Serial.println(me-&gt;m_LedPin);
+pinMode(me-&gt;m_LedPin, OUTPUT);
+me-&gt;m_BlinkCounter = 0;</entry>
+     <initial target="../2">
+      <initial_glyph conn="78,27,4,0,11">
+       <action box="0,-2,10,2"/>
+      </initial_glyph>
+     </initial>
+     <tran trig="LED_RESET" target="..">
+      <tran_glyph conn="28,85,3,1,136">
+       <action box="2,2,21,4"/>
+      </tran_glyph>
+     </tran>
+     <state name="OFF">
+      <entry>digitalWrite(me-&gt;m_LedPin, 0);
+
+if(me-&gt;m_BlinkCounter &gt; 0)
+{
+    me-&gt;m_BlinkCounter--;
+    QActive_armX(&amp;me-&gt;super, 0U, BSP_TICKS_PER_SEC/10, 0U);
+}</entry>
+      <exit>QActive_disarmX(&amp;me-&gt;super, 0U);
+</exit>
+      <tran trig="LED_ON" target="../../3">
+       <tran_glyph conn="82,43,1,3,31">
+        <action box="14,-2,10,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="LED_BLINK">
+       <action>uint8_t blink = (uint8_t)(Q_PAR(me));
+
+Serial.print(&quot;Adding blinks : &quot;); Serial.println(blink);
+
+me-&gt;m_BlinkCounter += blink*2-1;
+
+QACTIVE_POST(&amp;me-&gt;super, LED_ON_SIG, 0U);</action>
+       <tran_glyph conn="31,63,3,-1,42">
+        <action box="1,1,49,17"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="Q_TIMEOUT" target="../../3">
+       <tran_glyph conn="82,51,1,3,31">
+        <action box="12,-3,13,2"/>
+       </tran_glyph>
+      </tran>
+      <state_glyph node="31,38,51,44">
+       <entry box="1,2,50,16"/>
+       <exit box="1,18,28,5"/>
+      </state_glyph>
+     </state>
+     <state name="ON">
+      <entry>digitalWrite(me-&gt;m_LedPin, 1);
+
+if(me-&gt;m_BlinkCounter &gt;= 0)
+{
+    if(me-&gt;m_BlinkCounter&gt;0)
+    {
+        me-&gt;m_BlinkCounter--;
+    }
+    QActive_armX(&amp;me-&gt;super, 0U, BSP_TICKS_PER_SEC/10, 0U);
+}</entry>
+      <exit>QActive_disarmX(&amp;me-&gt;super, 0U);
+</exit>
+      <tran trig="LED_OFF" target="../../2">
+       <tran_glyph conn="113,61,3,1,-31">
+        <action box="-18,-3,10,2"/>
+       </tran_glyph>
+      </tran>
+      <tran trig="Q_TIMEOUT" target="../../2">
+       <tran_glyph conn="113,56,3,1,-31">
+        <action box="-19,-3,16,2"/>
+       </tran_glyph>
+      </tran>
+      <state_glyph node="113,38,49,32">
+       <entry box="1,2,48,21"/>
+       <exit box="1,23,30,6"/>
+      </state_glyph>
+     </state>
+     <state_glyph node="28,21,136,71">
+      <entry box="1,2,31,11"/>
+     </state_glyph>
+    </state>
+    <state_diagram size="224,145"/>
+   </statechart>
+  </class>
+  <class name="Radio433" superclass="qpn::QActive">
+   <attribute name="m_SpeedFactor" type="uint8_t" visibility="0x00" properties="0x00"/>
+   <attribute name="m_Delay1" type="uint8_t" visibility="0x00" properties="0x00"/>
+   <attribute name="m_Delay2" type="uint8_t" visibility="0x00" properties="0x00"/>
+   <statechart>
+    <initial target="../3">
+     <initial_glyph conn="72,13,4,0,8">
+      <action box="3,-1,10,2"/>
+     </initial_glyph>
+    </initial>
+    <state name="IDLE">
+     <entry brief="cut power of receiver">Serial.println(&quot;433Mhz module idleing&quot;);
+// TODO cut receiver power
+// reset timer config?</entry>
+     <tran trig="MODE_RECEIVER" target="../../2">
+      <tran_glyph conn="59,49,1,3,25">
+       <action box="5,-3,19,2"/>
+      </tran_glyph>
+     </tran>
+     <state_glyph node="25,37,34,15">
+      <entry box="1,2,20,2"/>
+     </state_glyph>
+    </state>
+    <state name="RECEIVING">
+     <documentation>When waiting for data, power saving is hard</documentation>
+     <entry brief="activate power of receiver and setup timer">Serial.println(&quot;433Mhz module enter receiver mode&quot;);
+
+// TODO activate power on receiver
+
+/*
+Timer 2 is used with a ATMega328.
+http://www.atmel.com/dyn/resources/prod_documents/doc8161.pdf page 162
+How to find the correct value: (OCRxA +1) = F_CPU / prescaler / 1953.125
+OCR2A is only 8 bit register
+*/
+
+TCCR2A = _BV(WGM21); // reset counter on match
+#if F_CPU == 1000000UL
+  TCCR2B = _BV(CS21); // 1/8 prescaler
+  OCR2A = (64 &gt;&gt; me-&gt;m_SpeedFactor) - 1;
+#elif F_CPU == 8000000UL
+  TCCR2B = _BV(CS21) | _BV(CS20); // 1/32 prescaler
+  OCR2A = (128 &gt;&gt; me-&gt;m_SpeedFactor) - 1; 
+#elif F_CPU == 16000000UL
+  TCCR2B = _BV(CS22); // 1/64 prescaler
+  OCR2A = (128 &gt;&gt; me-&gt;m_SpeedFactor) - 1; 
+#else
+  #error &quot;Manchester library only supports 8mhz, 16mhz on ATMega328&quot;
+#endif
+TIMSK2 = _BV(OCIE2A); // Turn on interrupt
+TCNT2 = 0; // Set counter to 0
+
+man.beginReceiveArray(RADIO433_BUFFER_SIZE, RADIO433_BUFFER_);
+
+QActive_armX(&amp;me-&gt;super, 0U, BSP_TICKS_PER_SEC, 0U);
+</entry>
+     <exit>QActive_disarmX(&amp;me-&gt;super, 0U);</exit>
+     <tran trig="Q_TIMEOUT">
+      <action>if (man.receiveComplete())
+{
+    Serial.println();
+    Serial.println(&quot;-----------&quot;); // device
+    //do something with the data in 'buffer' here before you start receiving to the same buffer again
+    Serial.print(&quot;Device id:&quot;); // device
+    Serial.println(RADIO433_BUFFER_[1]); // device
+
+
+    Serial.print(&quot;Sensor type:&quot;); // device
+    Serial.println(RADIO433_BUFFER_[2]); // sensor type
+
+    Serial.print(RADIO433_BUFFER_[3]); // byte 1 
+    Serial.print(&quot;.&quot;);
+    Serial.print(RADIO433_BUFFER_[4]); // byte 2
+    Serial.println(&quot;°C&quot;);
+
+    man.beginReceiveArray(RADIO433_BUFFER_SIZE, RADIO433_BUFFER_);
+}
+QActive_armX(&amp;me-&gt;super, 0U, BSP_TICKS_PER_SEC, 0U);</action>
+      <tran_glyph conn="84,44,3,-1,28">
+       <action box="1,0,33,5"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="IDLE" target="../../1">
+      <tran_glyph conn="84,42,3,1,-25">
+       <action box="-13,-4,10,4"/>
+      </tran_glyph>
+     </tran>
+     <state_glyph node="84,37,36,17">
+      <entry box="1,2,32,2"/>
+      <exit box="1,4,20,3"/>
+     </state_glyph>
+    </state>
+    <state name="INITIAL">
+     <entry>Serial.println(&quot;433Mhz module configured&quot;);
+
+/*
+#define MAN_300 0
+#define MAN_600 1
+#define MAN_1200 2
+#define MAN_2400 3
+#define MAN_4800 4
+#define MAN_9600 5
+#define MAN_19200 6
+#define MAN_38400 7
+*/
+
+man.setup(RADIO433_TX_PIN, RADIO433_RX_PIN, RADIO433_FACTOR);
+me-&gt;m_SpeedFactor = RADIO433_FACTOR;
+
+//we don't use exact calculation of passed time spent outside of transmitter
+//because of high ovehead associated with it, instead we use this 
+//emprirically determined values to compensate for the time loss
+  
+#if F_CPU == 1000000UL
+  uint16_t compensationFactor = 88; //must be divisible by 8 for workaround
+#elif F_CPU == 8000000UL
+  uint16_t compensationFactor = 12; 
+#else //16000000Mhz
+  uint16_t compensationFactor = 4; 
+#endif  
+
+#if (F_CPU == 80000000UL) || (F_CPU == 160000000)   // ESP8266 80MHz or 160 MHz
+  me-&gt;m_Delay1 = me-&gt;m_Delay2 = (HALF_BIT_INTERVAL &gt;&gt; me-&gt;m_SpeedFactor) - 2;
+#else
+  me-&gt;m_Delay1 = (HALF_BIT_INTERVAL &gt;&gt; me-&gt;m_SpeedFactor) - compensationFactor;
+  me-&gt;m_Delay2 = (HALF_BIT_INTERVAL &gt;&gt; me-&gt;m_SpeedFactor) - 2;
+  
+  #if F_CPU == 1000000UL
+    me-&gt;m_Delay2 -= 22; //22+2 = 24 is divisible by 8
+    if (applyWorkAround1Mhz) { //definition of micro delay is broken for 1MHz speed in tiny cores as of now (May 2013)
+      //this is a workaround that will allow us to transmit on 1Mhz
+      //divide the wait time by 8
+      me-&gt;m_Delay1 &gt;&gt;= 3;
+      me-&gt;m_Delay2 &gt;&gt;= 3;
+    }
+  #endif
+#endif
+
+uint8_t isDeactivated = digitalRead(RADIO433_IDLE_PIN);
+if(isDeactivated)
+{
+    QACTIVE_POST(&amp;me-&gt;super, IDLE_SIG, 0U);
+}
+else
+{
+    QACTIVE_POST(&amp;me-&gt;super, MODE_RECEIVER_SIG, 0U);
+}</entry>
+     <tran trig="IDLE" target="../../1">
+      <tran_glyph conn="58,24,3,0,-13,13">
+       <action box="-10,-3,10,4"/>
+      </tran_glyph>
+     </tran>
+     <tran trig="MODE_RECEIVER" target="../../2">
+      <tran_glyph conn="89,25,1,0,5,12">
+       <action box="4,-4,19,2"/>
+      </tran_glyph>
+     </tran>
+     <state_glyph node="58,21,31,10">
+      <entry box="1,2,13,2"/>
+     </state_glyph>
+    </state>
+    <state_diagram size="141,74"/>
+   </statechart>
+  </class>
+ </package>
+ <directory name=".">
+  <file name="emitter_receiver_gateway.ino" codec="UTF-8">
+   <text>#include &quot;erg.h&quot;
+#include &quot;Radio433.h&quot;
+
+//#include &lt;avr/sleep.h&gt;
+
+Q_DEFINE_THIS_MODULE(&quot;emmiter_receiver_gateway&quot;)
+
+
+// define to println() many information
+// #DEFINE TRACE 1
+
+Led AO_RedLed;
+Led AO_Led13;
+Radio433 AO_Radio433;
+
+// QF_active[] array defines all active object control blocks ----------------
+static QEvt l_led13QSto[10]; // Event queue storage for Led
+static QEvt l_radio433QSto[10]; // Event queue storage for Radio
+
+QActiveCB const Q_ROM QF_active[] = {
+  { (QActive *)0,            (QEvt *)0,        0U                    },
+  { (QActive *)&amp;AO_Led13,    l_led13QSto,      Q_DIM(l_led13QSto)    },
+  { (QActive *)&amp;AO_Radio433, l_radio433QSto,   Q_DIM(l_radio433QSto) }
+};
+
+void PrintInfo()
+{
+    Serial.print(F(&quot;QP-nano: &quot;));
+    Serial.println(F(QP_VERSION_STR));
+
+    Serial.print(&quot;CPU Freq: &quot;);
+    Serial.print(F_CPU / 1000000);
+    Serial.println(&quot;Mhz&quot;);
+
+    Serial.print(&quot;State machine ticks/s: &quot;);
+    Serial.println(BSP_TICKS_PER_SEC);
+
+    Serial.print(&quot;433Mhz baud rate: &quot;);
+    Serial.print(4800);
+    Serial.println(&quot;bps&quot;);
+
+    Serial.print(&quot;UART baud rate: &quot;);
+    Serial.print(UART_SPEED);
+    Serial.println(&quot;bps&quot;);
+}
+
+/*!
+* Called when the state of MODE_SEL_PIN changes
+*/
+unsigned int debounceModeChange = 0;
+void OnModeChange()
+{
+    if(millis()-debounceModeChange &gt; 100)
+    {
+        // if we read 1, this is the pullup and thus
+        // the jumper has been removed
+        uint8_t isDeactivated = digitalRead(RADIO433_IDLE_PIN);
+        if(isDeactivated)
+        {
+            QACTIVE_POST(&amp;AO_Radio433, IDLE_SIG, 0U);
+        }
+        else
+        {
+            QACTIVE_POST(&amp;AO_Radio433, MODE_RECEIVER_SIG, 0U);
+        }
+    }
+}
+
+//............................................................................
+void setup()
+{
+   // initialize the QF-nano framework
+    QF_init(Q_DIM(QF_active));
+
+    QActive_ctor(&amp;AO_Led13.super,    Q_STATE_CAST(&amp;Led_initial));
+    QActive_ctor(&amp;AO_Radio433.super, Q_STATE_CAST(&amp;Radio433_initial));
+
+    AO_Led13.m_LedPin = LED13_PIN;
+
+    pinMode(RADIO433_IDLE_PIN, INPUT);
+    pinMode(5, OUTPUT);
+
+    digitalWrite(RADIO433_IDLE_PIN, 1);
+    attachInterrupt(0, OnModeChange, CHANGE);
+
+    pinMode(UART_POWER_CTRL_PIN, OUTPUT);
+
+    Serial.begin(UART_SPEED);
+    Serial.println(&quot;433Mhz/Bluetooth gateway Ready&quot;);
+    PrintInfo();
+}
+
+void loop()
+{
+    // run the QP-nano application
+    QF_run();
+}
+
+volatile unsigned long _lastMillis = 0;
+volatile unsigned long _CurrMillis = 0;
+ISR(TIMER0_COMPA_vect) 
+{
+ _CurrMillis = millis();
+ uint8_t duration = _CurrMillis - _lastMillis;
+ if(duration &gt; BSP_TICK_DURATION_MS)
+ {
+    //Serial.print(&quot;Tick :&quot;);
+    //Serial.print(duration);
+    //Serial.println(&quot; ms&quot;);
+
+    QF_tickXISR(0);
+
+    if (Serial.available() &gt; 0) 
+    {
+
+        if (Serial.available() &gt; 0) 
+        {
+            switch (Serial.read()) 
+            {
+                case 'p':
+                case 'P':
+                {
+                   PrintInfo();
+                   break;
+                }
+                case 'r':
+                case 'R':
+                {
+                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Led13,    LED_BLINK_SIG,     4U);
+                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Radio433, MODE_RECEIVER_SIG, 0U);
+                   break;
+                }
+                case 'i':
+                case 'I':
+                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Led13,    LED_BLINK_SIG,    1U);
+                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Radio433, IDLE_SIG,         0U);
+                   break;
+
+                case 'u':
+                case 'U':
+                   digitalWrite(UART_POWER_CTRL_PIN,  0);
+                   break;
+
+                case 'a':
+                case 'A':
+                   digitalWrite(UART_POWER_CTRL_PIN,  1);
+                   break;
+
+            }
+        }
+    }
+    _lastMillis = _CurrMillis;
+ }
+}
+
+//============================================================================
+
+// QF callbacks...
+void QF_onStartup(void)
+{
+
+#ifdef TRACE
+    Serial.println(F(&quot;QF_onStartup&quot;));
+#endif
+
+    // Do not paralyse TIMER2 here. Use TIMER0, used for millis().
+    // see https://learn.adafruit.com/multi-tasking-the-arduino-part-2/timers
+
+    // Timer0 is an 8-bit that counts from 0 to 255 and generates an interrupt 
+    // whenever it overflows. It uses a clock divisor of 64 by default to give us 
+    // an interrupt rate of 976.5625 Hz (close enough to a 1KHz for our purposes).
+    OCR0A = 0xAF;
+    TIMSK0 |= _BV(OCIE0A);
+
+    // set Timer2 in CTC mode, 1/1024 prescaler, start the timer ticking...
+    //TCCR2A = (1U &lt;&lt; WGM21) | (0U &lt;&lt; WGM20);
+    //TCCR2B = (1U &lt;&lt; CS22 ) | (1U &lt;&lt; CS21) | (1U &lt;&lt; CS20); // 1/2^10
+    //ASSR  &amp;= ~(1U &lt;&lt; AS2);
+    //TIMSK2 = (1U &lt;&lt; OCIE2A); // enable TIMER2 compare Interrupt
+    //TCNT2  = 0U;
+
+    // set the output-compare register based on the desired tick frequency
+    //OCR2A  = (F_CPU / BSP_TICKS_PER_SEC / 1024U) - 1U;
+}
+
+//............................................................................
+void QV_onIdle(void) 
+{   // called with interrupts DISABLED
+
+#ifdef TRACE
+    Serial.println(F(&quot;QV_onIdle&quot;));
+#endif
+
+    // Put the CPU and peripherals to the low-power mode. You might
+    // need to customize the clock management for your application,
+    // see the datasheet for your particular AVR MCU.
+    SMCR = (0 &lt;&lt; SM0) | (1 &lt;&lt; SE); // idle mode, adjust to your project
+    QV_CPU_SLEEP();  // atomically go to sleep and enable interrupts
+}
+
+//............................................................................
+void Q_onAssert(char const Q_ROM * const file, int line) 
+{
+#ifdef TRACE
+    // implement the error-handling policy for your application!!!
+    Serial.print(F(&quot;Assertion raised in '&quot;));
+    Serial.print(file);
+    Serial.print(F(&quot;' at line&quot;));
+    Serial.print(line);
+#endif
+    QF_INT_DISABLE(); // disable all interrupts
+    QF_RESET();  // reset the CPU
+}</text>
+  </file>
+  <file name="manchester.h" codec="UTF-8">
+   <text>/*
+
+
+https://github.com/mchr3k/arduino-libs-manchester
+
+
+
+This code is based on the Atmel Corporation Manchester
+Coding Basics Application Note.
+
+http://www.atmel.com/dyn/resources/prod_documents/doc9164.pdf
+
+Quotes from the application note:
+
+&quot;Manchester coding states that there will always be a transition of the message signal
+at the mid-point of the data bit frame.
+What occurs at the bit edges depends on the state of the previous bit frame and
+does not always produce a transition. A logical '1' is defined as a mid-point transition
+from low to high and a '0' is a mid-point transition from high to low.
+ 
+We use Timing Based Manchester Decode.
+In this approach we will capture the time between each transition coming from the demodulation
+circuit.&quot;
+
+Timer 2 is used with a ATMega328. Timer 1 is used for a ATtiny85 and ATtiny84
+
+This code gives a basic data rate as 1200 bauds. In manchester encoding we send 1 0 for a data bit 0.
+We send 0 1 for a data bit 1. This ensures an average over time of a fixed DC level in the TX/RX.
+This is required by the ASK RF link system to ensure its correct operation.
+The data rate is then 600 bits/s. Higher and lower rates are also supported.
+*/
+
+#ifndef MANCHESTER_h
+#define MANCHESTER_h
+
+//timer scaling factors for different transmission speeds
+#define MAN_300 0
+#define MAN_600 1
+#define MAN_1200 2
+#define MAN_2400 3
+#define MAN_4800 4
+#define MAN_9600 5
+#define MAN_19200 6
+#define MAN_38400 7
+
+/*
+Timer 2 in the ATMega328 and Timer 1 in a ATtiny85 is used to find the time between
+each transition coming from the demodulation circuit.
+Their setup is for sampling the input in regular intervals.
+For practical reasons we use power of 2 timer prescaller for sampling, 
+for best timing we use pulse lenght as integer multiple of sampling speed.
+We chose to sample every 8 ticks, and pulse lenght of 48 ticks 
+thats 6 samples per pulse, lower sampling rate (3) will not work well for 
+innacurate clocks (like internal oscilator) higher sampling rate (12) will
+cause too much overhead and will not work at higher transmission speeds.
+This gives us 16000000Hz/48/256 = 1302 pulses per second (so it's not really 1200) 
+At different transmission speeds or on different microcontroller frequencies, clock prescaller is adjusted 
+to be compatible with those values. We allow about 50% clock speed difference both ways
+allowing us to transmit even with up to 100% in clock speed difference
+*/
+
+// added by caoxp@github
+// 
+// the sync pulse amount for transmitting and receiving.
+// a pulse means : HI,LO   or  LO,HI   
+// usually SYNC_PULSE_MAX &gt;= SYNC_PULSE_DEF + 2
+//         SYNC_PULSE_MIN &lt;= SYNC_PULSE_DEF + 2
+//  consider the pulses rising when starting transmitting.
+//  SYNC_PULSE_MIN should be much less than SYNC_PULSE_DEF
+//  all maximum of 255
+#define     SYNC_PULSE_MIN  1
+#define     SYNC_PULSE_DEF  3
+#define     SYNC_PULSE_MAX  5
+
+//#define       SYNC_PULSE_MIN  10
+//#define       SYNC_PULSE_DEF  14
+//#define       SYNC_PULSE_MAX  16
+
+//define to use 1 or 0 to sync
+// when using 1 to sync, sending SYNC_PULSE_DEF 1's , and send a 0 to start data.
+//                       and end the transimitting by three 1's
+// when using 0 to sync, sending SYNC_PULSE_DEF 0's , and send a 1 to start data.
+//                       and end the transimitting by three 0's
+
+#define     SYNC_BIT_VALUE      0
+//decoding not finished.
+//#define     SYNC_BIT_VALUE      0
+
+
+/*
+    Signal timing, we take sample every 8 clock ticks
+    
+    ticks:   [0]-[8]--[16]-[24]-[32]-[40]-[48]-[56]-[64]-[72]-[80]-[88]-[96][104][112][120][128][136]
+    samples: |----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+    single:  |                    [--------|----------]
+    double:  |                                         [-----------------|--------------------]
+    signal:  |_____________________________                               ______________________
+             |                             |_____________________________|
+
+*/
+
+//setup timing for receiver
+#define MinCount        33  //pulse lower count limit on capture
+#define MaxCount        65  //pulse higher count limit on capture
+#define MinLongCount    66  //pulse lower count on double pulse
+#define MaxLongCount    129 //pulse higher count on double pulse
+
+//setup timing for transmitter
+#define HALF_BIT_INTERVAL 3072 //(=48 * 1024 * 1000000 / 16000000Hz) microseconds for speed factor 0 (300baud)
+
+//it's common to zero terminate a string or to transmit small numbers involving a lot of zeroes
+//those zeroes may be mistaken for training pattern, confusing the receiver and resulting high packet lost, 
+//therefore we xor the data with random decoupling mask
+#define DECOUPLING_MASK 0b11001010 
+
+#define RX_MODE_PRE 0
+#define RX_MODE_SYNC 1
+#define RX_MODE_DATA 2
+#define RX_MODE_MSG 3
+#define RX_MODE_IDLE 4
+
+#define TimeOutDefault -1 //the timeout in msec default blocks
+
+#if defined(ARDUINO) &amp;&amp; ARDUINO &gt;= 100
+  #include &quot;Arduino.h&quot;
+#else
+  #include &quot;WProgram.h&quot;
+  #include &lt;pins_arduino.h&gt;
+#endif
+
+class Manchester
+{
+  public:
+    Manchester(); //the constructor
+    void setTxPin(uint8_t pin); //set the arduino digital pin for transmit. 
+    void setRxPin(uint8_t pin); //set the arduino digital pin for receive.
+    
+    void workAround1MhzTinyCore(uint8_t a = 1); //apply workaround for defect in tiny Core library for 1Mhz
+    void setupTransmit(uint8_t pin, uint8_t SF = MAN_1200); //set up transmission
+    void setupReceive(uint8_t pin, uint8_t SF = MAN_1200); //set up receiver
+    void setup(uint8_t Tpin, uint8_t Rpin, uint8_t SF = MAN_1200); //set up receiver
+    
+    void transmit(uint16_t data); //transmit 16 bits of data
+    void transmitArray(uint8_t numBytes, uint8_t *data); // transmit array of bytes
+    
+    uint8_t decodeMessage(uint16_t m, uint8_t &amp;id, uint8_t &amp;data); //decode 8 bit payload and 4 bit ID from the message, return 1 of checksum is correct, otherwise 0
+    uint16_t encodeMessage(uint8_t id, uint8_t data); //encode 8 bit payload, 4 bit ID and 4 bit checksum into 16 bit
+    
+    //wrappers for global functions
+    void beginReceive(void);
+    void beginReceiveArray(uint8_t maxBytes, uint8_t *data);
+    uint8_t receiveComplete(void);
+    uint16_t getMessage(void);
+    void stopReceive(void);
+    uint8_t speedFactor;
+    uint16_t delay1;
+    uint16_t delay2;
+    
+  private:
+    void sendZero(void);
+    void sendOne(void);
+    uint8_t TxPin;
+    uint8_t applyWorkAround1Mhz;
+};//end of class Manchester
+
+// Cant really do this as a real C++ class, since we need to have
+// an ISR
+extern &quot;C&quot;
+{
+    //set the arduino digital pin for receive. default 4.
+    extern void MANRX_SetRxPin(uint8_t pin);
+    
+    //begin the timer used to receive data
+    extern void MANRX_SetupReceive(uint8_t speedFactor = MAN_1200);
+    
+    // begin receiving 16 bits
+    extern void MANRX_BeginReceive(void);
+    
+    // begin receiving a byte array
+    extern void MANRX_BeginReceiveBytes(uint8_t maxBytes, uint8_t *data);
+    
+    // true if a complete message is ready
+    extern uint8_t MANRX_ReceiveComplete(void);
+    
+    // fetch the received message
+    extern uint16_t MANRX_GetMessage(void);
+    
+    // stop receiving data
+    extern void MANRX_StopReceive(void);
+}
+
+extern Manchester man;
+
+#endif
+</text>
+  </file>
+  <file name="manchester.cpp" codec="UTF-8">
+   <text>/*
+This code is based on the Atmel Corporation Manchester
+Coding Basics Application Note.
+
+http://www.atmel.com/dyn/resources/prod_documents/doc9164.pdf
+
+Quotes from the application note:
+
+&quot;Manchester coding states that there will always be a transition of the message signal
+at the mid-point of the data bit frame.
+What occurs at the bit edges depends on the state of the previous bit frame and
+does not always produce a transition. A logical '1' is defined as a mid-point transition
+from low to high and a '0' is a mid-point transition from high to low.
+
+We use Timing Based Manchester Decode.
+In this approach we will capture the time between each transition coming from the demodulation
+circuit.&quot;
+
+Timer 2 is used with a ATMega328. Timer 1 is used for a ATtiny85.
+
+This code gives a basic data rate as 1200 bauds. In manchester encoding we send 1 0 for a data bit 0.
+We send 0 1 for a data bit 1. This ensures an average over time of a fixed DC level in the TX/RX.
+This is required by the ASK RF link system to ensure its correct operation.
+The data rate is then 600 bits/s.
+*/
+
+#include &quot;Manchester.h&quot;
+
+static int8_t RxPin = 255;
+
+static int16_t rx_sample = 0;
+static int16_t rx_last_sample = 0;
+static uint8_t rx_count = 0;
+static uint8_t rx_sync_count = 0;
+static uint8_t rx_mode = RX_MODE_IDLE;
+
+static uint16_t rx_manBits = 0; //the received manchester 32 bits
+static uint8_t rx_numMB = 0; //the number of received manchester bits
+static uint8_t rx_curByte = 0;
+
+static uint8_t rx_maxBytes = 2;
+static uint8_t rx_default_data[2];
+static uint8_t* rx_data = rx_default_data;
+
+Manchester::Manchester() //constructor
+{
+  applyWorkAround1Mhz = 0;
+}
+
+
+void Manchester::setTxPin(uint8_t pin)
+{
+  TxPin = pin; // user sets the digital pin as output
+  pinMode(TxPin, OUTPUT); 
+}
+
+
+void Manchester::setRxPin(uint8_t pin)
+{
+  ::RxPin = pin; // user sets the digital pin as output
+  pinMode(::RxPin, INPUT); 
+}
+
+void Manchester::workAround1MhzTinyCore(uint8_t a)
+{
+  applyWorkAround1Mhz = a;
+}
+
+void Manchester::setupTransmit(uint8_t pin, uint8_t SF)
+{
+  setTxPin(pin);
+  speedFactor = SF;
+  //we don't use exact calculation of passed time spent outside of transmitter
+  //because of high ovehead associated with it, instead we use this 
+  //emprirically determined values to compensate for the time loss
+  
+  #if F_CPU == 1000000UL
+    uint16_t compensationFactor = 88; //must be divisible by 8 for workaround
+  #elif F_CPU == 8000000UL
+    uint16_t compensationFactor = 12; 
+  #else //16000000Mhz
+    uint16_t compensationFactor = 4; 
+  #endif  
+
+#if (F_CPU == 80000000UL) || (F_CPU == 160000000)   // ESP8266 80MHz or 160 MHz
+  delay1 = delay2 = (HALF_BIT_INTERVAL &gt;&gt; speedFactor) - 2;
+#else
+  delay1 = (HALF_BIT_INTERVAL &gt;&gt; speedFactor) - compensationFactor;
+  delay2 = (HALF_BIT_INTERVAL &gt;&gt; speedFactor) - 2;
+  
+  #if F_CPU == 1000000UL
+    delay2 -= 22; //22+2 = 24 is divisible by 8
+    if (applyWorkAround1Mhz) { //definition of micro delay is broken for 1MHz speed in tiny cores as of now (May 2013)
+      //this is a workaround that will allow us to transmit on 1Mhz
+      //divide the wait time by 8
+      delay1 &gt;&gt;= 3;
+      delay2 &gt;&gt;= 3;
+    }
+  #endif
+#endif
+}
+
+
+void Manchester::setupReceive(uint8_t pin, uint8_t SF)
+{
+  setRxPin(pin);
+  ::MANRX_SetupReceive(SF);
+}
+
+
+void Manchester::setup(uint8_t Tpin, uint8_t Rpin, uint8_t SF)
+{
+  setupTransmit(Tpin, SF);
+  setupReceive(Rpin, SF);
+}
+
+
+void Manchester::transmit(uint16_t data)
+{
+  uint8_t byteData[2] = {data &gt;&gt; 8, data &amp; 0xFF};
+  transmitArray(2, byteData);
+}
+
+/*
+The 433.92 Mhz receivers have AGC, if no signal is present the gain will be set
+to its highest level.
+
+In this condition it will switch high to low at random intervals due to input noise.
+A CRO connected to the data line looks like 433.92 is full of transmissions.
+
+Any ASK transmission method must first sent a capture signal of 101010........
+When the receiver has adjusted its AGC to the required level for the transmisssion
+the actual data transmission can occur.
+
+We send 14 0's 1010... It takes 1 to 3 10's for the receiver to adjust to
+the transmit level.
+
+The receiver waits until we have at least 10 10's and then a start pulse 01.
+The receiver is then operating correctly and we have locked onto the transmission.
+*/
+void Manchester::transmitArray(uint8_t numBytes, uint8_t *data)
+{
+
+#if SYNC_BIT_VALUE
+  for( int8_t i = 0; i &lt; SYNC_PULSE_DEF; i++) //send capture pulses
+  {
+    sendOne(); //end of capture pulses
+  }
+  sendZero(); //start data pulse
+#else
+  for( int8_t i = 0; i &lt; SYNC_PULSE_DEF; i++) //send capture pulses
+  {
+    sendZero(); //end of capture pulses
+  }
+  sendOne(); //start data pulse
+#endif
+ 
+  // Send the user data
+  for (uint8_t i = 0; i &lt; numBytes; i++)
+  {
+    uint16_t mask = 0x01; //mask to send bits
+    uint8_t d = data[i] ^ DECOUPLING_MASK;
+    for (uint8_t j = 0; j &lt; 8; j++)
+    {
+      if ((d &amp; mask) == 0)
+        sendZero();
+      else
+        sendOne();
+      mask &lt;&lt;= 1; //get next bit
+    }//end of byte
+  }//end of data
+
+  // Send 3 terminatings 0's to correctly terminate the previous bit and to turn the transmitter off
+#if SYNC_BIT_VALUE
+  sendOne();
+  sendOne();
+  sendOne();
+#else
+  sendZero();
+  sendZero();
+  sendZero();
+#endif
+}//end of send the data
+
+
+void Manchester::sendZero(void)
+{
+  delayMicroseconds(delay1);
+  digitalWrite(TxPin, HIGH);
+
+  delayMicroseconds(delay2);
+  digitalWrite(TxPin, LOW);
+}//end of send a zero
+
+
+void Manchester::sendOne(void)
+{
+  delayMicroseconds(delay1);
+  digitalWrite(TxPin, LOW);
+
+  delayMicroseconds(delay2);
+  digitalWrite(TxPin, HIGH);
+}//end of send one
+
+//TODO use repairing codes perhabs?
+//http://en.wikipedia.org/wiki/Hamming_code
+
+/*
+    format of the message including checksum and ID
+    
+    [0][1][2][3][4][5][6][7][8][9][a][b][c][d][e][f]
+    [    ID    ][ checksum ][         data         ]      
+                  checksum = ID xor data[7:4] xor data[3:0] xor 0b0011
+                  
+*/
+
+//decode 8 bit payload and 4 bit ID from the message, return true if checksum is correct, otherwise false
+uint8_t Manchester::decodeMessage(uint16_t m, uint8_t &amp;id, uint8_t &amp;data)
+{
+  //extract components
+  data = (m &amp; 0xFF);
+  id = (m &gt;&gt; 12);
+  uint8_t ch = (m &gt;&gt; 8) &amp; 0b1111; //checksum received
+  //calculate checksum
+  uint8_t ech = (id ^ data ^ (data &gt;&gt; 4) ^ 0b0011) &amp; 0b1111; //checksum expected
+  return ch == ech;
+}
+
+//encode 8 bit payload, 4 bit ID and 4 bit checksum into 16 bit
+uint16_t Manchester::encodeMessage(uint8_t id, uint8_t data)
+{
+  uint8_t chsum = (id ^ data ^ (data &gt;&gt; 4) ^ 0b0011) &amp; 0b1111;
+  uint16_t m = ((id) &lt;&lt; 12) | (chsum &lt;&lt; 8) | (data);
+  return m;
+}
+
+void Manchester::beginReceiveArray(uint8_t maxBytes, uint8_t *data)
+{
+  ::MANRX_BeginReceiveBytes(maxBytes, data);
+}
+
+void Manchester::beginReceive(void)
+{
+  ::MANRX_BeginReceive();
+}
+
+
+uint8_t Manchester::receiveComplete(void)
+{
+  return ::MANRX_ReceiveComplete();
+}
+
+
+uint16_t Manchester::getMessage(void)
+{
+  return ::MANRX_GetMessage();
+}
+
+
+void Manchester::stopReceive(void)
+{
+  ::MANRX_StopReceive();
+}
+
+//global functions
+
+#if defined( ESP8266 )
+   volatile uint16_t ESPtimer = 0;
+   void timer0_ISR (void);
+#endif
+
+void MANRX_SetupReceive(uint8_t speedFactor)
+{
+  pinMode(RxPin, INPUT);
+  //setup timers depending on the microcontroller used
+
+  #if defined( ESP8266 )
+   #if F_CPU == 80000000
+      ESPtimer = (512 &gt;&gt; speedFactor) * 80;  // 8MHZ, 300us for MAN_300, 128us for MAN_1200
+   #elif F_CPU == 160000000
+      ESPtimer = (512 &gt;&gt; speedFactor) * 160;
+   #endif
+
+   noInterrupts();
+   timer0_isr_init();
+   timer0_attachInterrupt(timer0_ISR);
+   timer0_write(ESP.getCycleCount() + ESPtimer); //80Mhz -&gt; 128us
+   interrupts();
+  #elif defined( __AVR_ATtiny25__ ) || defined( __AVR_ATtiny45__ ) || defined( __AVR_ATtiny85__ )
+
+    /*
+    Timer 1 is used with a ATtiny85. 
+    http://www.atmel.com/Images/Atmel-2586-AVR-8-bit-Microcontroller-ATtiny25-ATtiny45-ATtiny85_Datasheet.pdf page 88
+    How to find the correct value: (OCRxA +1) = F_CPU / prescaler / 1953.125
+    OCR1C is 8 bit register
+    */
+
+    #if F_CPU == 1000000UL
+      TCCR1 = _BV(CTC1) | _BV(CS12); // 1/8 prescaler
+      OCR1C = (64 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 8000000UL
+      TCCR1 = _BV(CTC1) | _BV(CS12) | _BV(CS11) | _BV(CS10); // 1/64 prescaler
+      OCR1C = (64 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 16000000UL
+      TCCR1 = _BV(CTC1) | _BV(CS12) | _BV(CS11) | _BV(CS10); // 1/64 prescaler
+      OCR1C = (128 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 16500000UL     
+      TCCR1 = _BV(CTC1) | _BV(CS12) | _BV(CS11) | _BV(CS10); // 1/64 prescaler
+      OCR1C = (132 &gt;&gt; speedFactor) - 1; 
+    #else
+    #error &quot;Manchester library only supports 1mhz, 8mhz, 16mhz, 16.5Mhz clock speeds on ATtiny85 chip&quot;
+    #endif
+    
+    OCR1A = 0; // Trigger interrupt when TCNT1 is reset to 0
+    TIMSK |= _BV(OCIE1A); // Turn on interrupt
+    TCNT1 = 0; // Set counter to 0
+
+  #elif defined( __AVR_ATtiny2313__ ) || defined( __AVR_ATtiny2313A__ ) || defined( __AVR_ATtiny4313__ )
+
+    /*
+    Timer 1 is used with a ATtiny2313. 
+    http://www.atmel.com/Images/doc2543.pdf page 107
+    How to find the correct value: (OCRxA +1) = F_CPU / prescaler / 1953.125
+    OCR1A/B are 8 bit registers
+    */
+
+    #if F_CPU == 1000000UL
+      TCCR1A = 0;
+      TCCR1B = _BV(WGM12) | _BV(CS11); // reset counter on match, 1/8 prescaler
+      OCR1A = (64 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 8000000UL
+      TCCR1B = _BV(WGM12) | _BV(CS12) | _BV(CS11) | _BV(CS10); // 1/64 prescaler
+      OCR1A = (64 &gt;&gt; speedFactor) - 1; 
+    #else
+    #error &quot;Manchester library only supports 1mhz, 8mhz clock speeds on ATtiny2313 chip&quot;
+    #endif
+    
+    OCR1B = 0; // Trigger interrupt when TCNT1 is reset to 0
+    TIMSK |= _BV(OCIE1B); // Turn on interrupt
+    TCNT1 = 0; // Set counter to 0
+
+  #elif defined( __AVR_ATtiny24__ ) || defined( __AVR_ATtiny24A__ ) || defined( __AVR_ATtiny44__ ) || defined( __AVR_ATtiny44A__ ) || defined( __AVR_ATtiny84__ ) || defined( __AVR_ATtiny84A__ )
+
+    /*
+    Timer 1 is used with a ATtiny84. 
+    http://www.atmel.com/Images/doc8006.pdf page 111
+    How to find the correct value: (OCRxA +1) = F_CPU / prescaler / 1953.125
+    OCR1A is 8 bit register
+    */
+
+    #if F_CPU == 1000000UL
+      TCCR1B = _BV(WGM12) | _BV(CS11); // 1/8 prescaler
+      OCR1A = (64 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 8000000UL
+      TCCR1B = _BV(WGM12) | _BV(CS11) | _BV(CS10); // 1/64 prescaler
+      OCR1A = (64 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 16000000UL
+      TCCR1B = _BV(WGM12) | _BV(CS11) | _BV(CS10); // 1/64 prescaler
+      OCR1A = (128 &gt;&gt; speedFactor) - 1; 
+    #else
+    #error &quot;Manchester library only supports 1mhz, 8mhz, 16mhz on ATtiny84&quot;
+    #endif
+    
+    TIMSK1 |= _BV(OCIE1A); // Turn on interrupt
+    TCNT1 = 0; // Set counter to 0
+
+  #elif defined(__AVR_ATmega32U4__)
+
+    /*
+    Timer 3 is used with a ATMega32U4. 
+    http://www.atmel.com/Images/doc7766.pdf page 133
+    How to find the correct value: (OCRxA +1) = F_CPU / prescaler / 1953.125
+    OCR3A is 16 bit register
+    */
+    TCCR3A = 0;         // 2016, added, make it work for Leonardo
+    TCCR3B = 0;         // 2016, added, make it work for Leonardo
+    TCCR3B = _BV(WGM32) | _BV(CS31); // 1/8 prescaler
+    #if F_CPU == 1000000UL
+      OCR3A = (64 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 8000000UL
+      OCR3A = (512 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 16000000UL
+      OCR3A = (1024 &gt;&gt; speedFactor) - 1; 
+    #else
+    #error &quot;Manchester library only supports 1mhz, 8mhz, 16mhz on ATMega32U4&quot;
+    #endif
+    
+    TCCR3A = 0; // reset counter on match
+    TIFR3 = _BV(OCF3A); // clear interrupt flag
+    TIMSK3 = _BV(OCIE3A); // Turn on interrupt
+    TCNT3 = 0; // Set counter to 0
+
+  #elif defined(__AVR_ATmega8__)
+
+    /* 
+    Timer/counter 1 is used with ATmega8. 
+    http://www.atmel.com/Images/Atmel-2486-8-bit-AVR-microcontroller-ATmega8_L_datasheet.pdf page 99
+    How to find the correct value: (OCRxA +1) = F_CPU / prescaler / 1953.125
+    OCR1A is 16 bit register
+    */
+
+    TCCR1A = _BV(WGM12); // reset counter on match
+    TCCR1B =  _BV(CS11); // 1/8 prescaler
+    #if F_CPU == 1000000UL
+      OCR1A = (64 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 8000000UL
+      OCR1A = (512 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 16000000UL
+      OCR1A = (1024 &gt;&gt; speedFactor) - 1; 
+    #else
+    #error &quot;Manchester library only supports 1Mhz, 8mhz, 16mhz on ATMega8&quot;
+    #endif
+    TIFR = _BV(OCF1A);  // clear interrupt flag
+    TIMSK = _BV(OCIE1A); // Turn on interrupt
+    TCNT1 = 0; // Set counter to 0
+
+  #else // ATmega328 is a default microcontroller
+
+
+    /*
+    Timer 2 is used with a ATMega328.
+    http://www.atmel.com/dyn/resources/prod_documents/doc8161.pdf page 162
+    How to find the correct value: (OCRxA +1) = F_CPU / prescaler / 1953.125
+    OCR2A is only 8 bit register
+    */
+
+    TCCR2A = _BV(WGM21); // reset counter on match
+    #if F_CPU == 1000000UL
+      TCCR2B = _BV(CS21); // 1/8 prescaler
+      OCR2A = (64 &gt;&gt; speedFactor) - 1;
+    #elif F_CPU == 8000000UL
+      TCCR2B = _BV(CS21) | _BV(CS20); // 1/32 prescaler
+      OCR2A = (128 &gt;&gt; speedFactor) - 1; 
+    #elif F_CPU == 16000000UL
+      TCCR2B = _BV(CS22); // 1/64 prescaler
+      OCR2A = (128 &gt;&gt; speedFactor) - 1; 
+    #else
+    #error &quot;Manchester library only supports 8mhz, 16mhz on ATMega328&quot;
+    #endif
+    TIMSK2 = _BV(OCIE2A); // Turn on interrupt
+    TCNT2 = 0; // Set counter to 0
+  #endif
+
+} //end of setupReceive
+
+void MANRX_BeginReceive(void)
+{
+  rx_maxBytes = 2;
+  rx_data = rx_default_data;
+  rx_mode = RX_MODE_PRE;
+}
+
+void MANRX_BeginReceiveBytes(uint8_t maxBytes, uint8_t *data)
+{
+  rx_maxBytes = maxBytes;
+  rx_data = data;
+  rx_mode = RX_MODE_PRE;
+}
+
+void MANRX_StopReceive(void)
+{
+  rx_mode = RX_MODE_IDLE;
+}
+
+uint8_t MANRX_ReceiveComplete(void)
+{
+  return (rx_mode == RX_MODE_MSG);
+}
+
+uint16_t MANRX_GetMessage(void)
+{
+  return (((int16_t)rx_data[0]) &lt;&lt; 8) | (int16_t)rx_data[1];
+}
+
+
+void MANRX_SetRxPin(uint8_t pin)
+{
+  RxPin = pin;
+  pinMode(RxPin, INPUT);
+}//end of set transmit pin
+
+void AddManBit(uint16_t *manBits, uint8_t *numMB,
+               uint8_t *curByte, uint8_t *data,
+               uint8_t bit)
+{
+  *manBits &lt;&lt;= 1;
+  *manBits |= bit;
+  (*numMB)++;
+  if (*numMB == 16)
+  {
+    uint8_t newData = 0;
+    for (int8_t i = 0; i &lt; 8; i++)
+    {
+      // ManBits holds 16 bits of manchester data
+      // 1 = LO,HI
+      // 0 = HI,LO
+      // We can decode each bit by looking at the bottom bit of each pair.
+      newData &lt;&lt;= 1;
+      newData |= (*manBits &amp; 1); // store the one
+      *manBits = *manBits &gt;&gt; 2; //get next data bit
+    }
+    data[*curByte] = newData ^ DECOUPLING_MASK;
+    (*curByte)++;
+
+    // added by caoxp @ https://github.com/caoxp
+    // compatible with unfixed-length data, with the data length defined by the first byte.
+    // at a maximum of 255 total data length.
+    if( (*curByte) == 1)
+    {
+      rx_maxBytes = data[0];
+    }
+    
+    *numMB = 0;
+  }
+}
+
+
+#if defined( ESP8266 )
+void ICACHE_RAM_ATTR timer0_ISR (void)
+#elif defined( __AVR_ATtiny25__ ) || defined( __AVR_ATtiny45__ ) || defined( __AVR_ATtiny85__ )
+ISR(TIMER1_COMPA_vect)
+#elif defined( __AVR_ATtiny2313__ ) || defined( __AVR_ATtiny2313A__ ) || defined( __AVR_ATtiny4313__ )
+ISR(TIMER1_COMPB_vect)
+#elif defined( __AVR_ATtiny24__ ) || defined( __AVR_ATtiny24A__ ) || defined( __AVR_ATtiny44__ ) || defined( __AVR_ATtiny44A__ ) || defined( __AVR_ATtiny84__ ) || defined( __AVR_ATtiny84A__ )
+ISR(TIM1_COMPA_vect)
+#elif defined(__AVR_ATmega32U4__)
+ISR(TIMER3_COMPA_vect)
+#else
+ISR(TIMER2_COMPA_vect)
+#endif
+{
+  if (rx_mode &lt; RX_MODE_MSG) //receiving something
+  {
+    // Increment counter
+    rx_count += 8;
+    
+    // Check for value change
+    //rx_sample = digitalRead(RxPin);
+    // caoxp@github, 
+    // add filter.
+    // sample twice, only the same means a change.
+    static uint8_t rx_sample_0=0;
+    static uint8_t rx_sample_1=0;
+    rx_sample_1 = digitalRead(RxPin);
+    if( rx_sample_1 == rx_sample_0 )
+    {
+      rx_sample = rx_sample_1;
+    }
+    rx_sample_0 = rx_sample_1;
+
+
+    //check sample transition
+    uint8_t transition = (rx_sample != rx_last_sample);
+  
+    if (rx_mode == RX_MODE_PRE)
+    {
+      // Wait for first transition to HIGH
+      if (transition &amp;&amp; (rx_sample == 1))
+      {
+        rx_count = 0;
+        rx_sync_count = 0;
+        rx_mode = RX_MODE_SYNC;
+      }
+    }
+    else if (rx_mode == RX_MODE_SYNC)
+    {
+      // Initial sync block
+      if (transition)
+      {
+        if( ( (rx_sync_count &lt; (SYNC_PULSE_MIN * 2) )  || (rx_last_sample == 1)  ) &amp;&amp;
+            ( (rx_count &lt; MinCount) || (rx_count &gt; MaxCount)))
+        {
+          // First 20 bits and all 1 bits are expected to be regular
+          // Transition was too slow/fast
+          rx_mode = RX_MODE_PRE;
+        }
+        else if((rx_last_sample == 0) &amp;&amp;
+                ((rx_count &lt; MinCount) || (rx_count &gt; MaxLongCount)))
+        {
+          // 0 bits after the 20th bit are allowed to be a double bit
+          // Transition was too slow/fast
+          rx_mode = RX_MODE_PRE;
+        }
+        else
+        {
+          rx_sync_count++;
+          
+          if((rx_last_sample == 0) &amp;&amp;
+             (rx_sync_count &gt;= (SYNC_PULSE_MIN * 2) ) &amp;&amp;
+             (rx_count &gt;= MinLongCount))
+          {
+            // We have seen at least 10 regular transitions
+            // Lock sequence ends with unencoded bits 01
+            // This is encoded and TX as HI,LO,LO,HI
+            // We have seen a long low - we are now locked!
+            rx_mode    = RX_MODE_DATA;
+            rx_manBits = 0;
+            rx_numMB   = 0;
+            rx_curByte = 0;
+          }
+          else if (rx_sync_count &gt;= (SYNC_PULSE_MAX * 2) )
+          {
+            rx_mode = RX_MODE_PRE;
+          }
+          rx_count = 0;
+        }
+      }
+    }
+    else if (rx_mode == RX_MODE_DATA)
+    {
+      // Receive data
+      if (transition)
+      {
+        if((rx_count &lt; MinCount) ||
+           (rx_count &gt; MaxLongCount))
+        {
+          // wrong signal lenght, discard the message
+          rx_mode = RX_MODE_PRE;
+        }
+        else
+        {
+          if(rx_count &gt;= MinLongCount) // was the previous bit a double bit?
+          {
+            AddManBit(&amp;rx_manBits, &amp;rx_numMB, &amp;rx_curByte, rx_data, rx_last_sample);
+          }
+          if ((rx_sample == 1) &amp;&amp;
+              (rx_curByte &gt;= rx_maxBytes))
+          {
+            rx_mode = RX_MODE_MSG;
+          }
+          else
+          {
+            // Add the current bit
+            AddManBit(&amp;rx_manBits, &amp;rx_numMB, &amp;rx_curByte, rx_data, rx_sample);
+            rx_count = 0;
+          }
+        }
+      }
+    }
+    
+    // Get ready for next loop
+    rx_last_sample = rx_sample;
+  }
+#if defined( ESP8266 )
+  timer0_write(ESP.getCycleCount() + ESPtimer);
+#endif
+}
+
+Manchester man;
+</text>
+  </file>
+  <file name="radio433.h" codec="UTF-8">
+   <text>#ifndef RADIO433_H
+#define RADIO433_H
+
+#include &quot;erg.h&quot;
+#include &quot;manchester.h&quot;
+#include &quot;led.h&quot;
+#include &quot;radioProtocol.h&quot;
+
+#define RADIO433_BUFFER_SIZE 20
+static uint8_t RADIO433_BUFFER_[RADIO433_BUFFER_SIZE];
+
+enum Radio433Signals{
+    MODE_RECEIVER_SIG = Q_USER_SIG,
+    IDLE_SIG
+};
+
+$declare(AOs::Radio433)
+
+#endif</text>
+  </file>
+  <file name="radio433.cpp" codec="UTF-8">
+   <text>#include &quot;Radio433.h&quot;
+
+$define(AOs::Radio433)</text>
+  </file>
+  <file name="radioProtocol.h" codec="UTF-8">
+   <text>#ifndef RADIO_PROTOCOL_H
+#define RADIO_PROTOCOL_H
+
+// protocol definition, should
+// be shared with receiver/emitter
+
+enum {
+    MESSAGE_SIZE_POS,
+    DEV_ID_POS,
+    SENSOR_ID_POS,
+    SENSOR_BYTE_1_POS,
+    SENSOR_BYTE_2_POS
+};
+
+//uint8_t TEMP_SENSOR_ID= 0x0;
+
+#endif</text>
+  </file>
+  <file name="led.h" codec="UTF-8">
+   <text>#ifndef LED_H
+#define LED_H
+
+#include &quot;erg.h&quot;
+
+enum LedSignals {
+    LED_ON_SIG = Q_USER_SIG,
+    LED_BLINK_SIG,
+    LED_OFF_SIG,
+    LED_RESET_SIG,
+    LED_SETUP_SIG
+};
+
+$declare(AOs::Led)
+
+#endif</text>
+  </file>
+  <file name="led.cpp">
+   <text>#include &quot;led.h&quot;
+
+$define(AOs::Led)</text>
+  </file>
+  <file name="erg.h" codec="UTF-8">
+   <text>#ifndef ERG_H
+#define ERG_H
+
+#include &quot;qpn.h&quot;
+#include &quot;Arduino.h&quot;
+#include &quot;manchester.h&quot;
+
+#define BSP_TICKS_PER_SEC  100 // number of system clock ticks in one second
+#define LED13_PIN          13  // the pin number of the on-board LED
+
+#define RADIO433_IDLE_PIN  2   // Active(ie 1) : emitter, Passive (ie 0) : receiver
+#define RADIO433_TX_PIN    4   // 433mhz Emitter pin
+#define RADIO433_RX_PIN    9   // 433mhz receiver pin
+#define RADIO433_FACTOR    MAN_4800 // 433mhz receiver pin
+
+// by default, HC5 BT module uses 9600bps, 
+// which means 4800 here since mini pro uses a x2 on transmit speed
+#define UART_SPEED        4800
+#define UART_POWER_CTRL_PIN 10
+
+// How many ms for a BSP tick
+const uint8_t BSP_TICK_DURATION_MS = 1000 / BSP_TICKS_PER_SEC -1;
+
+#endif</text>
+  </file>
+ </directory>
+</model>
