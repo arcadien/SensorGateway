@@ -24,11 +24,14 @@
 #include "radioProtocol.h"
 
 #define RADIO433_BUFFER_SIZE 20
-static uint8_t RADIO433_BUFFER_[RADIO433_BUFFER_SIZE];
+
+// TODO : EEPROM
+const uint16_t BAUDRATES[] = {300,600,1200,2400,4800,9600,19200,38400};
 
 enum Radio433Signals{
     MODE_RECEIVER_SIG = Q_USER_SIG,
-    IDLE_SIG
+    MODE_IDLE_SIG,
+    NEW_SPEED_FACTOR_SIG
 };
 
 
@@ -43,8 +46,7 @@ typedef struct Radio433 {
 
 /* public: */
     uint8_t m_SpeedFactor;
-    uint8_t m_Delay1;
-    uint8_t m_Delay2;
+    uint8_t RADIO433_BUFFER_[RADIO433_BUFFER_SIZE];
 } Radio433;
 
 /* protected: */

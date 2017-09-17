@@ -42,23 +42,51 @@ QActiveCB const Q_ROM QF_active[] = {
 
 void PrintInfo()
 {
-    Serial.print(F("QP-nano: "));
-    Serial.println(F(QP_VERSION_STR));
+    Serial.println(F("---- 433Mhz Gateway ----"));
 
-    Serial.print("CPU Freq: ");
+    //Serial.print(F("QP-nano version: "));
+    //Serial.println(F(QP_VERSION_STR));
+
+    Serial.print(F("* CPU Freq: "));
     Serial.print(F_CPU / 1000000);
-    Serial.println("Mhz");
+    Serial.println(F("Mhz"));
 
-    Serial.print("State machine ticks/s: ");
+    Serial.print(F("* State machine ticks/s: "));
     Serial.println(BSP_TICKS_PER_SEC);
 
-    Serial.print("433Mhz baud rate: ");
-    Serial.print(4800);
-    Serial.println("bps");
+    Serial.print(F("* 433Mhz baud rate: "));
+    Serial.print(BAUDRATES[AO_Radio433.m_SpeedFactor]);
+    Serial.println(F("bps"));
 
-    Serial.print("UART baud rate: ");
+    Serial.print("* UART baud rate: ");
     Serial.print(UART_SPEED);
-    Serial.println("bps");
+    Serial.println(F("bps"));
+
+    if(digitalRead(UART_POWER_CTRL_PIN))
+    {
+        Serial.println(F("* UART power is active"));
+    }
+    else
+    {
+        Serial.println(F("* UART power is not active"));
+    }
+
+    Serial.println(F("Commands : "));
+
+    Serial.println(F("h/H   : Help (this display"));
+    Serial.println(F("r/R   : Switch to receiver mode"));
+    Serial.println(F("i/I   : Switch to idle mode"));
+    Serial.println(F("u/U   : Enable UART power (in case of BT module)"));
+    Serial.println(F("a/A   : Disable UART power (in case of BT module)"));
+    Serial.println(F("fx/Fx : Change 433Mhz baud rate. Values for x :"));
+    Serial.println(F("        0 : 300 bps"));
+    Serial.println(F("        1 : 600 bps"));
+    Serial.println(F("        2 : 1200 bps"));
+    Serial.println(F("        3 : 2400 bps"));
+    Serial.println(F("        4 : 4800 bps"));
+    Serial.println(F("        5 : 9600 bps"));
+    Serial.println(F("        6 : 19200 bps"));
+    Serial.println(F("        7 : 38400 bps"));
 }
 
 /*!
@@ -74,7 +102,7 @@ void OnModeChange()
         uint8_t isDeactivated = digitalRead(RADIO433_IDLE_PIN);
         if(isDeactivated)
         {
-            QACTIVE_POST(&AO_Radio433, IDLE_SIG, 0U);
+            QACTIVE_POST(&AO_Radio433, MODE_IDLE_SIG, 0U);
         }
         else
         {
@@ -102,8 +130,10 @@ void setup()
 
     pinMode(UART_POWER_CTRL_PIN, OUTPUT);
 
+
     Serial.begin(UART_SPEED);
-    Serial.println("433Mhz/Bluetooth gateway Ready");
+    Serial.setTimeout(5); // 5 ms waiting data on uart
+
     PrintInfo();
 }
 
@@ -134,12 +164,13 @@ ISR(TIMER0_COMPA_vect)
         {
             switch (Serial.read())
             {
-                case 'p':
-                case 'P':
+                case 'H':
+                case 'h':
                 {
                    PrintInfo();
                    break;
                 }
+
                 case 'r':
                 case 'R':
                 {
@@ -147,21 +178,46 @@ ISR(TIMER0_COMPA_vect)
                    QACTIVE_POST_ISR((QMActive *)&AO_Radio433, MODE_RECEIVER_SIG, 0U);
                    break;
                 }
+
                 case 'i':
                 case 'I':
+                {
                    QACTIVE_POST_ISR((QMActive *)&AO_Led13,    LED_BLINK_SIG,    1U);
-                   QACTIVE_POST_ISR((QMActive *)&AO_Radio433, IDLE_SIG,         0U);
+                   QACTIVE_POST_ISR((QMActive *)&AO_Radio433, MODE_IDLE_SIG,    0U);
                    break;
+                }
 
                 case 'u':
                 case 'U':
+                {
                    digitalWrite(UART_POWER_CTRL_PIN,  0);
                    break;
+                }
 
                 case 'a':
                 case 'A':
+                {
+                   digitalWrite(UART_POWER_CTRL_PIN,  0);
+                   break;
+                }
+
+                case 'b':
+                case 'B':
+                {
                    digitalWrite(UART_POWER_CTRL_PIN,  1);
                    break;
+                }
+
+                case 'f':
+                case 'F':
+                {
+                    uint8_t newSpeedFactor = Serial.read();
+                    QACTIVE_POST_ISR((QMActive *)&AO_Radio433, NEW_SPEED_FACTOR_SIG, newSpeedFactor);
+                    break;
+                }
+
+                default:
+                {}
 
             }
         }

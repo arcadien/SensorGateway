@@ -58,34 +58,17 @@ QState Radio433_RECEIVING(Radio433 * const me) {
     switch (Q_SIG(me)) {
         /* ${AOs::Radio433::SM::RECEIVING} */
         case Q_ENTRY_SIG: {
-            Serial.println("433Mhz module enter receiver mode");
+            Serial.print(F("433Mhz module enter receiver mode ("));
+            Serial.print(BAUDRATES[me->m_SpeedFactor]);
+            Serial.println(F(")bps"));
 
             // TODO activate power on receiver
 
-            /*
-            Timer 2 is used with a ATMega328.
-            http://www.atmel.com/dyn/resources/prod_documents/doc8161.pdf page 162
-            How to find the correct value: (OCRxA +1) = F_CPU / prescaler / 1953.125
-            OCR2A is only 8 bit register
-            */
 
-            TCCR2A = _BV(WGM21); // reset counter on match
-            #if F_CPU == 1000000UL
-              TCCR2B = _BV(CS21); // 1/8 prescaler
-              OCR2A = (64 >> me->m_SpeedFactor) - 1;
-            #elif F_CPU == 8000000UL
-              TCCR2B = _BV(CS21) | _BV(CS20); // 1/32 prescaler
-              OCR2A = (128 >> me->m_SpeedFactor) - 1;
-            #elif F_CPU == 16000000UL
-              TCCR2B = _BV(CS22); // 1/64 prescaler
-              OCR2A = (128 >> me->m_SpeedFactor) - 1;
-            #else
-              #error "Manchester library only supports 8mhz, 16mhz on ATMega328"
-            #endif
-            TIMSK2 = _BV(OCIE2A); // Turn on interrupt
-            TCNT2 = 0; // Set counter to 0
+            man.setup(RADIO433_TX_PIN, RADIO433_RX_PIN, me->m_SpeedFactor);
 
-            man.beginReceiveArray(RADIO433_BUFFER_SIZE, RADIO433_BUFFER_);
+
+            man.beginReceiveArray(RADIO433_BUFFER_SIZE, me->RADIO433_BUFFER_);
 
             QActive_armX(&me->super, 0U, BSP_TICKS_PER_SEC, 0U);
 
@@ -94,6 +77,14 @@ QState Radio433_RECEIVING(Radio433 * const me) {
         }
         /* ${AOs::Radio433::SM::RECEIVING} */
         case Q_EXIT_SIG: {
+            man.stopReceive();
+
+            for(uint8_t i = 0 ; i < RADIO433_BUFFER_SIZE; ++i)
+            {
+                me->RADIO433_BUFFER_[i] = 0;
+            }
+            Serial.println(F("Reception stopped and buffer cleared"));
+
             QActive_disarmX(&me->super, 0U);
             status_ = Q_HANDLED();
             break;
@@ -106,34 +97,46 @@ QState Radio433_RECEIVING(Radio433 * const me) {
                 Serial.println("-----------"); // device
                 //do something with the data in 'buffer' here before you start receiving to the same buffer again
                 Serial.print("Device id:"); // device
-                Serial.println(RADIO433_BUFFER_[1]); // device
+                Serial.println(me->RADIO433_BUFFER_[1]); // device
 
 
                 Serial.print("Sensor type:"); // device
-                Serial.println(RADIO433_BUFFER_[2]); // sensor type
+                Serial.println(me->RADIO433_BUFFER_[2]); // sensor type
 
-                Serial.print(RADIO433_BUFFER_[3]); // byte 1
+                Serial.print(me->RADIO433_BUFFER_[3]); // byte 1
                 Serial.print(".");
-                Serial.print(RADIO433_BUFFER_[4]); // byte 2
+                Serial.print(me->RADIO433_BUFFER_[4]); // byte 2
                 Serial.println("°C");
 
-                uint8_t devid    = RADIO433_BUFFER_[1];
-                uint8_t senstype = RADIO433_BUFFER_[2];
-
-                if(devid == 1 && senstype == 0)
-                {
-                    digitalWrite(5, HIGH);
-                }
-
-                man.beginReceiveArray(RADIO433_BUFFER_SIZE, RADIO433_BUFFER_);
+                man.beginReceiveArray(RADIO433_BUFFER_SIZE, me->RADIO433_BUFFER_);
             }
             QActive_armX(&me->super, 0U, BSP_TICKS_PER_SEC, 0U);
             status_ = Q_HANDLED();
             break;
         }
-        /* ${AOs::Radio433::SM::RECEIVING::IDLE} */
-        case IDLE_SIG: {
+        /* ${AOs::Radio433::SM::RECEIVING::MODE_IDLE} */
+        case MODE_IDLE_SIG: {
             status_ = Q_TRAN(&Radio433_IDLE);
+            break;
+        }
+        /* ${AOs::Radio433::SM::RECEIVING::NEW_SPEED_FACTOR} */
+        case NEW_SPEED_FACTOR_SIG: {
+            uint8_t newSpeed = (uint8_t)(Q_PAR(me));
+
+            newSpeed -= 48; // 48 is char code for 0
+
+            if(newSpeed < 8)
+            {
+                Serial.print(F("Reconfigure baud rate for "));
+                Serial.print(BAUDRATES[me->m_SpeedFactor]);
+                Serial.println(F(" bps"));
+                me->m_SpeedFactor = newSpeed;
+            }
+            else
+            {
+                Serial.println(F("Invalid baudrate value received"));
+            }
+            status_ = Q_TRAN(&Radio433_RECEIVING);
             break;
         }
         default: {
@@ -151,53 +154,14 @@ QState Radio433_INITIAL(Radio433 * const me) {
         case Q_ENTRY_SIG: {
             Serial.println("433Mhz module configured");
 
-            /*
-            #define MAN_300 0
-            #define MAN_600 1
-            #define MAN_1200 2
-            #define MAN_2400 3
-            #define MAN_4800 4
-            #define MAN_9600 5
-            #define MAN_19200 6
-            #define MAN_38400 7
-            */
+            uint8_t isDeactivated = digitalRead(RADIO433_IDLE_PIN);
 
-            man.setup(RADIO433_TX_PIN, RADIO433_RX_PIN, RADIO433_FACTOR);
+            // default value for speed factor from constant
             me->m_SpeedFactor = RADIO433_FACTOR;
 
-            //we don't use exact calculation of passed time spent outside of transmitter
-            //because of high ovehead associated with it, instead we use this
-            //emprirically determined values to compensate for the time loss
-
-            #if F_CPU == 1000000UL
-              uint16_t compensationFactor = 88; //must be divisible by 8 for workaround
-            #elif F_CPU == 8000000UL
-              uint16_t compensationFactor = 12;
-            #else //16000000Mhz
-              uint16_t compensationFactor = 4;
-            #endif
-
-            #if (F_CPU == 80000000UL) || (F_CPU == 160000000)   // ESP8266 80MHz or 160 MHz
-              me->m_Delay1 = me->m_Delay2 = (HALF_BIT_INTERVAL >> me->m_SpeedFactor) - 2;
-            #else
-              me->m_Delay1 = (HALF_BIT_INTERVAL >> me->m_SpeedFactor) - compensationFactor;
-              me->m_Delay2 = (HALF_BIT_INTERVAL >> me->m_SpeedFactor) - 2;
-
-              #if F_CPU == 1000000UL
-                me->m_Delay2 -= 22; //22+2 = 24 is divisible by 8
-                if (applyWorkAround1Mhz) { //definition of micro delay is broken for 1MHz speed in tiny cores as of now (May 2013)
-                  //this is a workaround that will allow us to transmit on 1Mhz
-                  //divide the wait time by 8
-                  me->m_Delay1 >>= 3;
-                  me->m_Delay2 >>= 3;
-                }
-              #endif
-            #endif
-
-            uint8_t isDeactivated = digitalRead(RADIO433_IDLE_PIN);
             if(isDeactivated)
             {
-                QACTIVE_POST(&me->super, IDLE_SIG, 0U);
+                QACTIVE_POST(&me->super, MODE_IDLE_SIG, 0U);
             }
             else
             {
@@ -206,8 +170,8 @@ QState Radio433_INITIAL(Radio433 * const me) {
             status_ = Q_HANDLED();
             break;
         }
-        /* ${AOs::Radio433::SM::INITIAL::IDLE} */
-        case IDLE_SIG: {
+        /* ${AOs::Radio433::SM::INITIAL::MODE_IDLE} */
+        case MODE_IDLE_SIG: {
             status_ = Q_TRAN(&Radio433_IDLE);
             break;
         }

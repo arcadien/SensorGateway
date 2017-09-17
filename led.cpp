@@ -34,7 +34,7 @@ QState Led_READY(Led * const me) {
     switch (Q_SIG(me)) {
         /* ${AOs::Led::SM::READY} */
         case Q_ENTRY_SIG: {
-            Serial.print(F("LED driver for pin "));
+            Serial.print(F("LED driver activated on pin "));
             Serial.println(me->m_LedPin);
             pinMode(me->m_LedPin, OUTPUT);
             me->m_BlinkCounter = 0;
@@ -90,7 +90,7 @@ QState Led_OFF(Led * const me) {
         case LED_BLINK_SIG: {
             uint8_t blink = (uint8_t)(Q_PAR(me));
 
-            Serial.print("Adding blinks : "); Serial.println(blink);
+            Serial.print(F("Adding blinks : ")); Serial.println(blink);
 
             me->m_BlinkCounter += blink*2-1;
 
