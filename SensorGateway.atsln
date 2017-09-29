@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Atmel Studio Solution File, Format Version 11.00
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{E66E83B9-2572-4076-B26E-6BE79FF3018A}") = "emitter_receiver_gateway", "emitter_receiver_gateway.cppproj", "{DCE6C7E3-EE26-4D79-826B-08594B9AD897}"
+EndProject
+Project("{E66E83B9-2572-4076-B26E-6BE79FF3018A}") = "ArduinoCore", "ArduinoCore\ArduinoCore.cppproj", "{092E8DA3-C0B1-4B0C-9987-9019D955AB5D}"
+EndProject
+Project("{E66E83B9-2572-4076-B26E-6BE79FF3018A}") = "qp_nano_avr", "qp_nano_avr\qp_nano_avr.cppproj", "{65BE15F3-AB7E-4E20-9C76-B251EC252936}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|AVR = Debug|AVR
+		Release|AVR = Release|AVR
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Debug|AVR.ActiveCfg = Debug|AVR
+		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Debug|AVR.Build.0 = Debug|AVR
+		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Release|AVR.ActiveCfg = Release|AVR
+		{DCE6C7E3-EE26-4D79-826B-08594B9AD897}.Release|AVR.Build.0 = Release|AVR
+		{092E8DA3-C0B1-4B0C-9987-9019D955AB5D}.Debug|AVR.ActiveCfg = Debug|AVR
+		{092E8DA3-C0B1-4B0C-9987-9019D955AB5D}.Debug|AVR.Build.0 = Debug|AVR
+		{092E8DA3-C0B1-4B0C-9987-9019D955AB5D}.Release|AVR.ActiveCfg = Release|AVR
+		{092E8DA3-C0B1-4B0C-9987-9019D955AB5D}.Release|AVR.Build.0 = Release|AVR
+		{65BE15F3-AB7E-4E20-9C76-B251EC252936}.Debug|AVR.ActiveCfg = Debug|AVR
+		{65BE15F3-AB7E-4E20-9C76-B251EC252936}.Debug|AVR.Build.0 = Debug|AVR
+		{65BE15F3-AB7E-4E20-9C76-B251EC252936}.Release|AVR.ActiveCfg = Release|AVR
+		{65BE15F3-AB7E-4E20-9C76-B251EC252936}.Release|AVR.Build.0 = Release|AVR
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

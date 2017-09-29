@@ -136,7 +136,7 @@ man.setup(RADIO433_TX_PIN, RADIO433_RX_PIN, me-&gt;m_SpeedFactor);
 
 man.beginReceiveArray(RADIO433_BUFFER_SIZE, me-&gt;RADIO433_BUFFER_);
 
-QActive_armX(&amp;me-&gt;super, 0U, BSP_TICKS_PER_SEC, 0U);
+QActive_armX(&amp;me-&gt;super, 0U, BSP_TICKS_PER_SEC/5, 0U);
 </entry>
      <exit>man.stopReceive();
 
@@ -205,19 +205,11 @@ else
     <state name="INITIAL">
      <entry>Serial.println(&quot;433Mhz module configured&quot;);
 
-uint8_t isDeactivated = digitalRead(RADIO433_IDLE_PIN);
-
 // default value for speed factor from constant
 me-&gt;m_SpeedFactor = RADIO433_FACTOR;
 
-if(isDeactivated)
-{
-    QACTIVE_POST(&amp;me-&gt;super, MODE_IDLE_SIG, 0U);
-}
-else
-{
-    QACTIVE_POST(&amp;me-&gt;super, MODE_RECEIVER_SIG, 0U);
-}</entry>
+
+QACTIVE_POST(&amp;me-&gt;super, MODE_RECEIVER_SIG, 0U);</entry>
      <tran trig="MODE_IDLE" target="../../1">
       <tran_glyph conn="58,24,3,0,-13,13">
        <action box="-10,-3,10,4"/>
@@ -237,279 +229,9 @@ else
   </class>
  </package>
  <directory name=".">
-  <file name="emitter_receiver_gateway.ino" codec="UTF-8">
-   <text>#include &quot;erg.h&quot;
-#include &quot;Radio433.h&quot;
-
-//#include &lt;avr/sleep.h&gt;
-
-Q_DEFINE_THIS_MODULE(&quot;emmiter_receiver_gateway&quot;)
-
-
-// define to println() many information
-// #DEFINE TRACE 1
-
-Led AO_RedLed;
-Led AO_Led13;
-Radio433 AO_Radio433;
-
-// QF_active[] array defines all active object control blocks ----------------
-static QEvt l_led13QSto[10]; // Event queue storage for Led
-static QEvt l_radio433QSto[10]; // Event queue storage for Radio
-
-QActiveCB const Q_ROM QF_active[] = {
-  { (QActive *)0,            (QEvt *)0,        0U                    },
-  { (QActive *)&amp;AO_Led13,    l_led13QSto,      Q_DIM(l_led13QSto)    },
-  { (QActive *)&amp;AO_Radio433, l_radio433QSto,   Q_DIM(l_radio433QSto) }
-};
-
-void PrintInfo()
-{
-    Serial.println(F(&quot;---- 433Mhz Gateway ----&quot;));
-
-    //Serial.print(F(&quot;QP-nano version: &quot;));
-    //Serial.println(F(QP_VERSION_STR));
-
-    Serial.print(F(&quot;* CPU Freq: &quot;));
-    Serial.print(F_CPU / 1000000);
-    Serial.println(F(&quot;Mhz&quot;));
-
-    Serial.print(F(&quot;* State machine ticks/s: &quot;));
-    Serial.println(BSP_TICKS_PER_SEC);
-
-    Serial.print(F(&quot;* 433Mhz baud rate: &quot;));
-    Serial.print(BAUDRATES[AO_Radio433.m_SpeedFactor]);
-    Serial.println(F(&quot;bps&quot;));
-
-    Serial.print(&quot;* UART baud rate: &quot;);
-    Serial.print(UART_SPEED);
-    Serial.println(F(&quot;bps&quot;));
-
-    if(digitalRead(UART_POWER_CTRL_PIN))
-    {
-        Serial.println(F(&quot;* UART power is active&quot;));
-    }
-    else
-    {
-        Serial.println(F(&quot;* UART power is not active&quot;));
-    }
-
-    Serial.println(F(&quot;Commands : &quot;));
-
-    Serial.println(F(&quot;h/H   : Help (this display&quot;));
-    Serial.println(F(&quot;r/R   : Switch to receiver mode&quot;));
-    Serial.println(F(&quot;i/I   : Switch to idle mode&quot;));
-    Serial.println(F(&quot;u/U   : Enable UART power (in case of BT module)&quot;));
-    Serial.println(F(&quot;a/A   : Disable UART power (in case of BT module)&quot;));
-    Serial.println(F(&quot;fx/Fx : Change 433Mhz baud rate. Values for x :&quot;));
-    Serial.println(F(&quot;        0 : 300 bps&quot;));
-    Serial.println(F(&quot;        1 : 600 bps&quot;));
-    Serial.println(F(&quot;        2 : 1200 bps&quot;));
-    Serial.println(F(&quot;        3 : 2400 bps&quot;));
-    Serial.println(F(&quot;        4 : 4800 bps&quot;));
-    Serial.println(F(&quot;        5 : 9600 bps&quot;));
-    Serial.println(F(&quot;        6 : 19200 bps&quot;));
-    Serial.println(F(&quot;        7 : 38400 bps&quot;));
-}
-
-/*!
-* Called when the state of MODE_SEL_PIN changes
-*/
-unsigned int debounceModeChange = 0;
-void OnModeChange()
-{
-    if(millis()-debounceModeChange &gt; 100)
-    {
-        // if we read 1, this is the pullup and thus
-        // the jumper has been removed
-        uint8_t isDeactivated = digitalRead(RADIO433_IDLE_PIN);
-        if(isDeactivated)
-        {
-            QACTIVE_POST(&amp;AO_Radio433, MODE_IDLE_SIG, 0U);
-        }
-        else
-        {
-            QACTIVE_POST(&amp;AO_Radio433, MODE_RECEIVER_SIG, 0U);
-        }
-    }
-}
-
-//............................................................................
-void setup()
-{
-   // initialize the QF-nano framework
-    QF_init(Q_DIM(QF_active));
-
-    QActive_ctor(&amp;AO_Led13.super,    Q_STATE_CAST(&amp;Led_initial));
-    QActive_ctor(&amp;AO_Radio433.super, Q_STATE_CAST(&amp;Radio433_initial));
-
-    AO_Led13.m_LedPin = LED13_PIN;
-
-    pinMode(RADIO433_IDLE_PIN, INPUT);
-    pinMode(5, OUTPUT);
-
-    digitalWrite(RADIO433_IDLE_PIN, 1);
-    attachInterrupt(0, OnModeChange, CHANGE);
-
-    pinMode(UART_POWER_CTRL_PIN, OUTPUT);
-
-
-    Serial.begin(UART_SPEED);
-    Serial.setTimeout(5); // 5 ms waiting data on uart
-    
-    PrintInfo();
-}
-
-void loop()
-{
-    // run the QP-nano application
-    QF_run();
-}
-
-volatile unsigned long _lastMillis = 0;
-volatile unsigned long _CurrMillis = 0;
-ISR(TIMER0_COMPA_vect) 
-{
- _CurrMillis = millis();
- uint8_t duration = _CurrMillis - _lastMillis;
- if(duration &gt; BSP_TICK_DURATION_MS)
- {
-    //Serial.print(&quot;Tick :&quot;);
-    //Serial.print(duration);
-    //Serial.println(&quot; ms&quot;);
-
-    QF_tickXISR(0);
-
-    if (Serial.available() &gt; 0) 
-    {
-
-        if (Serial.available() &gt; 0) 
-        {
-            switch (Serial.read()) 
-            {
-                case 'H':
-                case 'h':
-                {
-                   PrintInfo();
-                   break;
-                }
-
-                case 'r':
-                case 'R':
-                {
-                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Led13,    LED_BLINK_SIG,     4U);
-                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Radio433, MODE_RECEIVER_SIG, 0U);
-                   break;
-                }
-
-                case 'i':
-                case 'I':
-                {
-                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Led13,    LED_BLINK_SIG,    1U);
-                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Radio433, MODE_IDLE_SIG,    0U);
-                   break;
-                }
-
-                case 'u':
-                case 'U':
-                {
-                   digitalWrite(UART_POWER_CTRL_PIN,  0);
-                   break;
-                }
-
-                case 'a':
-                case 'A':
-                {
-                   digitalWrite(UART_POWER_CTRL_PIN,  0);
-                   break;
-                }
-
-                case 'b':
-                case 'B':
-                {
-                   digitalWrite(UART_POWER_CTRL_PIN,  1);
-                   break;
-                }
-
-                case 'f':
-                case 'F':
-                {
-                    uint8_t newSpeedFactor = Serial.read();
-                    QACTIVE_POST_ISR((QMActive *)&amp;AO_Radio433, NEW_SPEED_FACTOR_SIG, newSpeedFactor);
-                    break;
-                }
-    
-                default:
-                {}
-
-            }
-        }
-    }
-    _lastMillis = _CurrMillis;
- }
-}
-
-//============================================================================
-
-// QF callbacks...
-void QF_onStartup(void)
-{
-
-#ifdef TRACE
-    Serial.println(F(&quot;QF_onStartup&quot;));
-#endif
-
-    // Do not paralyse TIMER2 here. Use TIMER0, used for millis().
-    // see https://learn.adafruit.com/multi-tasking-the-arduino-part-2/timers
-
-    // Timer0 is an 8-bit that counts from 0 to 255 and generates an interrupt 
-    // whenever it overflows. It uses a clock divisor of 64 by default to give us 
-    // an interrupt rate of 976.5625 Hz (close enough to a 1KHz for our purposes).
-    OCR0A = 0xAF;
-    TIMSK0 |= _BV(OCIE0A);
-
-    // set Timer2 in CTC mode, 1/1024 prescaler, start the timer ticking...
-    //TCCR2A = (1U &lt;&lt; WGM21) | (0U &lt;&lt; WGM20);
-    //TCCR2B = (1U &lt;&lt; CS22 ) | (1U &lt;&lt; CS21) | (1U &lt;&lt; CS20); // 1/2^10
-    //ASSR  &amp;= ~(1U &lt;&lt; AS2);
-    //TIMSK2 = (1U &lt;&lt; OCIE2A); // enable TIMER2 compare Interrupt
-    //TCNT2  = 0U;
-
-    // set the output-compare register based on the desired tick frequency
-    //OCR2A  = (F_CPU / BSP_TICKS_PER_SEC / 1024U) - 1U;
-}
-
-//............................................................................
-void QV_onIdle(void) 
-{   // called with interrupts DISABLED
-
-#ifdef TRACE
-    Serial.println(F(&quot;QV_onIdle&quot;));
-#endif
-
-    // Put the CPU and peripherals to the low-power mode. You might
-    // need to customize the clock management for your application,
-    // see the datasheet for your particular AVR MCU.
-    SMCR = (0 &lt;&lt; SM0) | (1 &lt;&lt; SE); // idle mode, adjust to your project
-    QV_CPU_SLEEP();  // atomically go to sleep and enable interrupts
-}
-
-//............................................................................
-void Q_onAssert(char const Q_ROM * const file, int line) 
-{
-#ifdef TRACE
-    // implement the error-handling policy for your application!!!
-    Serial.print(F(&quot;Assertion raised in '&quot;));
-    Serial.print(file);
-    Serial.print(F(&quot;' at line&quot;));
-    Serial.print(line);
-#endif
-    QF_INT_DISABLE(); // disable all interrupts
-    QF_RESET();  // reset the CPU
-}</text>
-  </file>
-  <file name="manchester.h" codec="UTF-8">
-   <text>/*
+  <directory name="include">
+   <file name="manchester.h" codec="UTF-8">
+    <text>/*
 
 
 https://github.com/mchr3k/arduino-libs-manchester
@@ -704,9 +426,342 @@ extern Manchester man;
 
 #endif
 </text>
-  </file>
-  <file name="manchester.cpp" codec="UTF-8">
-   <text>/*
+   </file>
+   <file name="radio433.h" codec="UTF-8">
+    <text>#ifndef RADIO433_H
+#define RADIO433_H
+
+#include &quot;erg.h&quot;
+#include &quot;manchester.h&quot;
+#include &quot;led.h&quot;
+#include &quot;radioProtocol.h&quot;
+
+#define RADIO433_BUFFER_SIZE 20
+
+// TODO : EEPROM
+const uint16_t BAUDRATES[] = {300,600,1200,2400,4800,9600,19200,38400};
+
+enum Radio433Signals{
+    MODE_RECEIVER_SIG = Q_USER_SIG,
+    MODE_IDLE_SIG,
+    NEW_SPEED_FACTOR_SIG
+};
+
+$declare(AOs::Radio433)
+
+#endif</text>
+   </file>
+   <file name="radioProtocol.h" codec="UTF-8">
+    <text>#ifndef RADIO_PROTOCOL_H
+#define RADIO_PROTOCOL_H
+
+// protocol definition, should
+// be shared with receiver/emitter
+
+enum {
+    MESSAGE_SIZE_POS,
+    DEV_ID_POS,
+    SENSOR_ID_POS,
+    SENSOR_BYTE_1_POS,
+    SENSOR_BYTE_2_POS
+};
+
+//uint8_t TEMP_SENSOR_ID= 0x0;
+
+#endif</text>
+   </file>
+   <file name="led.h" codec="UTF-8">
+    <text>#ifndef LED_H
+#define LED_H
+
+#include &quot;erg.h&quot;
+
+enum LedSignals {
+    LED_ON_SIG = Q_USER_SIG,
+    LED_BLINK_SIG,
+    LED_OFF_SIG,
+    LED_RESET_SIG,
+    LED_SETUP_SIG
+};
+
+$declare(AOs::Led)
+
+#endif</text>
+   </file>
+   <file name="erg.h" codec="UTF-8">
+    <text>#ifndef ERG_H
+#define ERG_H
+
+#include &quot;qpn.h&quot;
+#include &quot;Arduino.h&quot;
+#include &quot;manchester.h&quot;
+
+#define BSP_TICKS_PER_SEC  100 // number of system clock ticks in one second
+#define LED13_PIN          13  // the pin number of the on-board LED
+
+#define RADIO433_TX_PIN    4   // 433mhz Emitter pin
+#define RADIO433_RX_PIN    9   // 433mhz receiver pin
+#define RADIO433_FACTOR    MAN_9600 // 433mhz default baudrate
+
+// by default, HC5 BT module uses 9600bps, 
+// which means 4800 here since mini pro uses a x2 on transmit speed
+#define UART_SPEED        4800
+#define UART_POWER_CTRL_PIN 10
+
+// How many ms for a BSP tick
+const uint8_t BSP_TICK_DURATION_MS = 1000 / BSP_TICKS_PER_SEC -1;
+
+#endif</text>
+   </file>
+  </directory>
+  <directory name="src">
+   <file name="emitter_receiver_gateway.cpp" codec="UTF-8">
+    <text>#include &quot;erg.h&quot;
+#include &quot;Radio433.h&quot;
+
+//#include &lt;avr/sleep.h&gt;
+
+Q_DEFINE_THIS_MODULE(&quot;emmiter_receiver_gateway&quot;)
+
+
+// define to println() many information
+// #DEFINE TRACE 1
+
+Led AO_RedLed;
+Led AO_Led13;
+Radio433 AO_Radio433;
+
+// QF_active[] array defines all active object control blocks ----------------
+static QEvt l_led13QSto[10]; // Event queue storage for Led
+static QEvt l_radio433QSto[10]; // Event queue storage for Radio
+
+QActiveCB const Q_ROM QF_active[] = {
+  { (QActive *)0,            (QEvt *)0,        0U                    },
+  { (QActive *)&amp;AO_Led13,    l_led13QSto,      Q_DIM(l_led13QSto)    },
+  { (QActive *)&amp;AO_Radio433, l_radio433QSto,   Q_DIM(l_radio433QSto) }
+};
+
+void PrintInfo()
+{
+    Serial.println(F(&quot;---- 433Mhz Gateway ----&quot;));
+
+    //Serial.print(F(&quot;QP-nano version: &quot;));
+    //Serial.println(F(QP_VERSION_STR));
+
+    Serial.print(F(&quot;* CPU Freq: &quot;));
+    Serial.print(F_CPU / 1000000);
+    Serial.println(F(&quot;Mhz&quot;));
+
+    Serial.print(F(&quot;* State machine ticks/s: &quot;));
+    Serial.println(BSP_TICKS_PER_SEC);
+
+    Serial.print(F(&quot;* 433Mhz baud rate: &quot;));
+    Serial.print(BAUDRATES[AO_Radio433.m_SpeedFactor]);
+    Serial.println(F(&quot;bps&quot;));
+
+    Serial.print(&quot;* UART baud rate: &quot;);
+    Serial.print(UART_SPEED);
+    Serial.println(F(&quot;bps&quot;));
+
+    if(digitalRead(UART_POWER_CTRL_PIN))
+    {
+        Serial.println(F(&quot;* UART power is active&quot;));
+    }
+    else
+    {
+        Serial.println(F(&quot;* UART power is not active&quot;));
+    }
+
+    Serial.println(F(&quot;Commands : &quot;));
+
+    Serial.println(F(&quot;h/H   : Help (this display&quot;));
+    Serial.println(F(&quot;r/R   : Switch to receiver mode&quot;));
+    Serial.println(F(&quot;i/I   : Switch to idle mode&quot;));
+    Serial.println(F(&quot;u/U   : Enable UART power (in case of BT module)&quot;));
+    Serial.println(F(&quot;a/A   : Disable UART power (in case of BT module)&quot;));
+    Serial.println(F(&quot;fx/Fx : Change 433Mhz baud rate. Values for x :&quot;));
+    Serial.println(F(&quot;        0 : 300 bps&quot;));
+    Serial.println(F(&quot;        1 : 600 bps&quot;));
+    Serial.println(F(&quot;        2 : 1200 bps&quot;));
+    Serial.println(F(&quot;        3 : 2400 bps&quot;));
+    Serial.println(F(&quot;        4 : 4800 bps&quot;));
+    Serial.println(F(&quot;        5 : 9600 bps&quot;));
+    Serial.println(F(&quot;        6 : 19200 bps&quot;));
+    Serial.println(F(&quot;        7 : 38400 bps&quot;));
+}
+
+//............................................................................
+void setup()
+{
+   // initialize the QF-nano framework 
+    QF_init(Q_DIM(QF_active));
+
+    QActive_ctor(&amp;AO_Led13.super,    Q_STATE_CAST(&amp;Led_initial));
+    QActive_ctor(&amp;AO_Radio433.super, Q_STATE_CAST(&amp;Radio433_initial));
+
+    AO_Led13.m_LedPin = LED13_PIN;
+
+    pinMode(5, OUTPUT);
+
+    pinMode(UART_POWER_CTRL_PIN, OUTPUT);
+
+
+    Serial.begin(UART_SPEED);
+    Serial.setTimeout(5); // 5 ms waiting data on uart
+
+    PrintInfo();
+}
+
+void loop()
+{
+    // run the QP-nano application
+    QF_run();
+}
+
+volatile unsigned long _lastMillis = 0;
+volatile unsigned long _CurrMillis = 0;
+ISR(TIMER0_COMPA_vect) 
+{
+ _CurrMillis = millis();
+ uint8_t duration = _CurrMillis - _lastMillis;
+ if(duration &gt; BSP_TICK_DURATION_MS)
+ {
+    //Serial.print(&quot;Tick :&quot;);
+    //Serial.print(duration);
+    //Serial.println(&quot; ms&quot;);
+
+    QF_tickXISR(0);
+
+        if (Serial.available() &gt; 0) 
+        {
+            switch (Serial.read()) 
+            {
+                case 'H':
+                case 'h':
+                {
+                   PrintInfo();
+                   break;
+                }
+
+                case 'r':
+                case 'R':
+                {
+                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Led13,    LED_BLINK_SIG,     4U);
+                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Radio433, MODE_RECEIVER_SIG, 0U);
+                   break;
+                }
+
+                case 'i':
+                case 'I':
+                {
+                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Led13,    LED_BLINK_SIG,    1U);
+                   QACTIVE_POST_ISR((QMActive *)&amp;AO_Radio433, MODE_IDLE_SIG,    0U);
+                   break;
+                }
+
+                case 'u':
+                case 'U':
+                {
+                   digitalWrite(UART_POWER_CTRL_PIN,  0);
+                   break;
+                }
+
+                case 'a':
+                case 'A':
+                {
+                   digitalWrite(UART_POWER_CTRL_PIN,  0);
+                   break;
+                }
+
+                case 'b':
+                case 'B':
+                {
+                   digitalWrite(UART_POWER_CTRL_PIN,  1);
+                   break;
+                }
+
+                case 'f':
+                case 'F':
+                {
+                    uint8_t newSpeedFactor = Serial.read();
+                    QACTIVE_POST_ISR((QMActive *)&amp;AO_Radio433, NEW_SPEED_FACTOR_SIG, newSpeedFactor);
+                    break;
+                }
+
+                default:
+                {}
+        }
+    }
+    _lastMillis = _CurrMillis;
+ }
+}
+
+//============================================================================
+
+// QF callbacks...
+void QF_onStartup(void)
+{
+
+#ifdef TRACE
+    Serial.println(F(&quot;QF_onStartup&quot;));
+#endif
+
+    // Do not paralyse TIMER2 here. Use TIMER0, used for millis().
+    // see https://learn.adafruit.com/multi-tasking-the-arduino-part-2/timers
+
+    // Timer0 is an 8-bit that counts from 0 to 255 and generates an interrupt 
+    // whenever it overflows. It uses a clock divisor of 64 by default to give us 
+    // an interrupt rate of 976.5625 Hz (close enough to a 1KHz for our purposes).
+    // Setup timer0
+    millis();
+    
+    OCR0A = 0xAF;
+    TIMSK0 |= _BV(OCIE0A);
+
+    // set Timer2 in CTC mode, 1/1024 prescaler, start the timer ticking...
+    //TCCR2A = (1U &lt;&lt; WGM21) | (0U &lt;&lt; WGM20);
+    //TCCR2B = (1U &lt;&lt; CS22 ) | (1U &lt;&lt; CS21) | (1U &lt;&lt; CS20); // 1/2^10
+    //ASSR  &amp;= ~(1U &lt;&lt; AS2);
+    //TIMSK2 = (1U &lt;&lt; OCIE2A); // enable TIMER2 compare Interrupt
+    //TCNT2  = 0U;
+
+    // set the output-compare register based on the desired tick frequency
+    //OCR2A  = (F_CPU / BSP_TICKS_PER_SEC / 1024U) - 1U;
+}
+
+//............................................................................
+void QV_onIdle(void) 
+{   // called with interrupts DISABLED
+
+#ifdef TRACE
+    Serial.println(F(&quot;QV_onIdle&quot;));
+#endif
+
+    //Serial.flush();
+
+    // Put the CPU and peripherals to the low-power mode. You might
+    // need to customize the clock management for your application,
+    // see the datasheet for your particular AVR MCU.
+    SMCR = (0 &lt;&lt; SM0) | (1 &lt;&lt; SE); // idle mode, adjust to your project
+    QV_CPU_SLEEP();  // atomically go to sleep and enable interrupts
+}
+
+//............................................................................
+void Q_onAssert(char const Q_ROM * const file, int line) 
+{
+#ifdef TRACE
+    // implement the error-handling policy for your application!!!
+    Serial.print(F(&quot;Assertion raised in '&quot;));
+    Serial.print(file);
+    Serial.print(F(&quot;' at line&quot;));
+    Serial.print(line);
+#endif
+    QF_INT_DISABLE(); // disable all interrupts
+    QF_RESET();  // reset the CPU
+}</text>
+   </file>
+   <file name="manchester.cpp" codec="UTF-8">
+    <text>/*
 This code is based on the Atmel Corporation Manchester
 Coding Basics Application Note.
 
@@ -1356,103 +1411,17 @@ ISR(TIMER2_COMPA_vect)
 
 Manchester man;
 </text>
-  </file>
-  <file name="radio433.h" codec="UTF-8">
-   <text>#ifndef RADIO433_H
-#define RADIO433_H
-
-#include &quot;erg.h&quot;
-#include &quot;manchester.h&quot;
-#include &quot;led.h&quot;
-#include &quot;radioProtocol.h&quot;
-
-#define RADIO433_BUFFER_SIZE 20
-
-// TODO : EEPROM
-const uint16_t BAUDRATES[] = {300,600,1200,2400,4800,9600,19200,38400};
-
-enum Radio433Signals{
-    MODE_RECEIVER_SIG = Q_USER_SIG,
-    MODE_IDLE_SIG,
-    NEW_SPEED_FACTOR_SIG
-};
-
-$declare(AOs::Radio433)
-
-#endif</text>
-  </file>
-  <file name="radio433.cpp" codec="UTF-8">
-   <text>#include &quot;Radio433.h&quot;
+   </file>
+   <file name="radio433.cpp" codec="UTF-8">
+    <text>#include &quot;Radio433.h&quot;
 
 $define(AOs::Radio433)</text>
-  </file>
-  <file name="radioProtocol.h" codec="UTF-8">
-   <text>#ifndef RADIO_PROTOCOL_H
-#define RADIO_PROTOCOL_H
-
-// protocol definition, should
-// be shared with receiver/emitter
-
-enum {
-    MESSAGE_SIZE_POS,
-    DEV_ID_POS,
-    SENSOR_ID_POS,
-    SENSOR_BYTE_1_POS,
-    SENSOR_BYTE_2_POS
-};
-
-//uint8_t TEMP_SENSOR_ID= 0x0;
-
-#endif</text>
-  </file>
-  <file name="led.h" codec="UTF-8">
-   <text>#ifndef LED_H
-#define LED_H
-
-#include &quot;erg.h&quot;
-
-enum LedSignals {
-    LED_ON_SIG = Q_USER_SIG,
-    LED_BLINK_SIG,
-    LED_OFF_SIG,
-    LED_RESET_SIG,
-    LED_SETUP_SIG
-};
-
-$declare(AOs::Led)
-
-#endif</text>
-  </file>
-  <file name="led.cpp">
-   <text>#include &quot;led.h&quot;
+   </file>
+   <file name="led.cpp">
+    <text>#include &quot;led.h&quot;
 
 $define(AOs::Led)</text>
-  </file>
-  <file name="erg.h" codec="UTF-8">
-   <text>#ifndef ERG_H
-#define ERG_H
-
-#include &quot;qpn.h&quot;
-#include &quot;Arduino.h&quot;
-#include &quot;manchester.h&quot;
-
-#define BSP_TICKS_PER_SEC  100 // number of system clock ticks in one second
-#define LED13_PIN          13  // the pin number of the on-board LED
-
-#define RADIO433_IDLE_PIN  2   // Active(ie 1) : emitter, Passive (ie 0) : receiver
-#define RADIO433_TX_PIN    4   // 433mhz Emitter pin
-#define RADIO433_RX_PIN    9   // 433mhz receiver pin
-#define RADIO433_FACTOR    MAN_4800 // 433mhz default baudrate
-
-// by default, HC5 BT module uses 9600bps, 
-// which means 4800 here since mini pro uses a x2 on transmit speed
-#define UART_SPEED        4800
-#define UART_POWER_CTRL_PIN 10
-
-// How many ms for a BSP tick
-const uint8_t BSP_TICK_DURATION_MS = 1000 / BSP_TICKS_PER_SEC -1;
-
-#endif</text>
-  </file>
+   </file>
+  </directory>
  </directory>
 </model>
