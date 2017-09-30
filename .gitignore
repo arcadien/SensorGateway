@@ -2,3 +2,4 @@ lib/
 bin/
 Debug
 Release
+.vs
