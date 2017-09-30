@@ -157,8 +157,6 @@ QState Radio433_INITIAL(Radio433 * const me) {
             // default value for speed factor from constant
             me->m_SpeedFactor = RADIO433_FACTOR;
 
-
-            QACTIVE_POST(&me->super, MODE_RECEIVER_SIG, 0U);
             status_ = Q_HANDLED();
             break;
         }

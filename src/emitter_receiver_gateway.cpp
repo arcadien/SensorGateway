@@ -17,7 +17,6 @@
 /*${.::src::emitter_receiver_gateway.cpp} ..................................*/
 #include "erg.h"
 #include "Radio433.h"
-#include "avr/sleep.h"
 
 //#include <avr/sleep.h>
 
@@ -244,9 +243,6 @@ void QV_onIdle(void)
     // see the datasheet for your particular AVR MCU.
     SMCR = (0 << SM0) | (1 << SE); // idle mode, adjust to your project
     QV_CPU_SLEEP();  // atomically go to sleep and enable interrupts
-	sleep_disable();
-	millis();
-
 }
 
 //............................................................................

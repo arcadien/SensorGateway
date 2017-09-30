@@ -174,7 +174,7 @@ QActive_armX(&amp;me-&gt;super, 0U, BSP_TICKS_PER_SEC, 0U);</action>
      </tran>
      <tran trig="MODE_IDLE" target="../../1">
       <tran_glyph conn="85,42,3,1,-26">
-       <action box="-15,-3,10,4"/>
+       <action box="-17,-3,10,4"/>
       </tran_glyph>
      </tran>
      <tran trig="NEW_SPEED_FACTOR" target="..">
@@ -194,7 +194,7 @@ else
     Serial.println(F(&quot;Invalid baudrate value received&quot;));
 }</action>
       <tran_glyph conn="85,57,3,3,-11,6,11">
-       <action box="-42,-1,37,13"/>
+       <action box="-44,0,41,32"/>
       </tran_glyph>
      </tran>
      <state_glyph node="85,37,36,30">
@@ -207,9 +207,7 @@ else
 
 // default value for speed factor from constant
 me-&gt;m_SpeedFactor = RADIO433_FACTOR;
-
-
-QACTIVE_POST(&amp;me-&gt;super, MODE_RECEIVER_SIG, 0U);</entry>
+</entry>
      <tran trig="MODE_IDLE" target="../../1">
       <tran_glyph conn="58,24,3,0,-13,13">
        <action box="-10,-3,10,4"/>
@@ -224,7 +222,7 @@ QACTIVE_POST(&amp;me-&gt;super, MODE_RECEIVER_SIG, 0U);</entry>
       <entry box="1,2,13,2"/>
      </state_glyph>
     </state>
-    <state_diagram size="141,74"/>
+    <state_diagram size="139,113"/>
    </statechart>
   </class>
  </package>
@@ -744,6 +742,8 @@ void QV_onIdle(void)
     // see the datasheet for your particular AVR MCU.
     SMCR = (0 &lt;&lt; SM0) | (1 &lt;&lt; SE); // idle mode, adjust to your project
     QV_CPU_SLEEP();  // atomically go to sleep and enable interrupts
+
+     
 }
 
 //............................................................................
