@@ -53,7 +53,6 @@ typedef struct Radio433 {
 QState Radio433_initial(Radio433 * const me);
 QState Radio433_IDLE(Radio433 * const me);
 QState Radio433_RECEIVING(Radio433 * const me);
-QState Radio433_INITIAL(Radio433 * const me);
 
 
 #endif

@@ -104,9 +104,9 @@ if(me-&gt;m_BlinkCounter &gt;= 0)
     <documentation>Buffer for bytes received via 433Mhz transceiver</documentation>
    </attribute>
    <statechart>
-    <initial target="../3">
-     <initial_glyph conn="72,13,4,0,8">
-      <action box="3,-1,10,2"/>
+    <initial target="../1">
+     <initial_glyph conn="40,26,4,0,11">
+      <action box="0,-2,10,2"/>
      </initial_glyph>
     </initial>
     <state name="IDLE">
@@ -184,10 +184,10 @@ newSpeed -= 48; // 48 is char code for 0
 
 if(newSpeed &lt; 8)
 {
+    me-&gt;m_SpeedFactor = newSpeed;
     Serial.print(F(&quot;Reconfigure baud rate for &quot;));
     Serial.print(BAUDRATES[me-&gt;m_SpeedFactor]);
     Serial.println(F(&quot; bps&quot;));
-    me-&gt;m_SpeedFactor = newSpeed;
 }
 else
 {
@@ -200,26 +200,6 @@ else
      <state_glyph node="85,37,36,30">
       <entry box="1,2,32,2"/>
       <exit box="1,4,20,3"/>
-     </state_glyph>
-    </state>
-    <state name="INITIAL">
-     <entry>Serial.println(&quot;433Mhz module configured&quot;);
-
-// default value for speed factor from constant
-me-&gt;m_SpeedFactor = RADIO433_FACTOR;
-</entry>
-     <tran trig="MODE_IDLE" target="../../1">
-      <tran_glyph conn="58,24,3,0,-13,13">
-       <action box="-10,-3,10,4"/>
-      </tran_glyph>
-     </tran>
-     <tran trig="MODE_RECEIVER" target="../../2">
-      <tran_glyph conn="89,25,1,0,6,12">
-       <action box="4,-4,19,2"/>
-      </tran_glyph>
-     </tran>
-     <state_glyph node="58,21,31,10">
-      <entry box="1,2,13,2"/>
      </state_glyph>
     </state>
     <state_diagram size="139,113"/>
@@ -501,9 +481,8 @@ $declare(AOs::Led)
 #define RADIO433_RX_PIN    9   // 433mhz receiver pin
 #define RADIO433_FACTOR    MAN_9600 // 433mhz default baudrate
 
-// by default, HC5 BT module uses 9600bps, 
-// which means 4800 here since mini pro uses a x2 on transmit speed
-#define UART_SPEED        4800
+// by default, HC5 BT module uses 9600bps
+#define UART_SPEED        9600
 #define UART_POWER_CTRL_PIN 10
 
 // How many ms for a BSP tick
@@ -598,7 +577,7 @@ void setup()
     QActive_ctor(&amp;AO_Radio433.super, Q_STATE_CAST(&amp;Radio433_initial));
 
     AO_Led13.m_LedPin = LED13_PIN;
-
+AO_Radio433.m_SpeedFactor = 4; // 4800bps for 433Mhz by default
     pinMode(5, OUTPUT);
 
     pinMode(UART_POWER_CTRL_PIN, OUTPUT);

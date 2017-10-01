@@ -9,10 +9,10 @@
   <item name="backups">0</item>
  </group>
  <group name="windows">
-  <item id="AOs::Radio433::SM">-731,0,1172,651</item>
-  <item id=".::include::radio433.h">0,0,674,300</item>
-  <item id=".::include::erg.h">407,240,674,300</item>
-  <item id=".::src::emitter_receiver_gateway.cpp">0,0,1081,540,*</item>
+  <item id="AOs::Radio433::SM">-628,0,1172,651</item>
+  <item id=".::include::radio433.h">0,364,674,300</item>
+  <item id=".::include::erg.h">0,0,969,649,*</item>
+  <item id=".::src::emitter_receiver_gateway.cpp">0,124,1081,540</item>
  </group>
  <group name="search">
   <item name="options">1966592</item>

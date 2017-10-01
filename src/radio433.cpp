@@ -26,7 +26,7 @@
 /*${AOs::Radio433::SM} .....................................................*/
 QState Radio433_initial(Radio433 * const me) {
     /* ${AOs::Radio433::SM::initial} */
-    return Q_TRAN(&Radio433_INITIAL);
+    return Q_TRAN(&Radio433_IDLE);
 }
 /*${AOs::Radio433::SM::IDLE} ...............................................*/
 QState Radio433_IDLE(Radio433 * const me) {
@@ -127,46 +127,15 @@ QState Radio433_RECEIVING(Radio433 * const me) {
 
             if(newSpeed < 8)
             {
+                me->m_SpeedFactor = newSpeed;
                 Serial.print(F("Reconfigure baud rate for "));
                 Serial.print(BAUDRATES[me->m_SpeedFactor]);
                 Serial.println(F(" bps"));
-                me->m_SpeedFactor = newSpeed;
             }
             else
             {
                 Serial.println(F("Invalid baudrate value received"));
             }
-            status_ = Q_TRAN(&Radio433_RECEIVING);
-            break;
-        }
-        default: {
-            status_ = Q_SUPER(&QHsm_top);
-            break;
-        }
-    }
-    return status_;
-}
-/*${AOs::Radio433::SM::INITIAL} ............................................*/
-QState Radio433_INITIAL(Radio433 * const me) {
-    QState status_;
-    switch (Q_SIG(me)) {
-        /* ${AOs::Radio433::SM::INITIAL} */
-        case Q_ENTRY_SIG: {
-            Serial.println("433Mhz module configured");
-
-            // default value for speed factor from constant
-            me->m_SpeedFactor = RADIO433_FACTOR;
-
-            status_ = Q_HANDLED();
-            break;
-        }
-        /* ${AOs::Radio433::SM::INITIAL::MODE_IDLE} */
-        case MODE_IDLE_SIG: {
-            status_ = Q_TRAN(&Radio433_IDLE);
-            break;
-        }
-        /* ${AOs::Radio433::SM::INITIAL::MODE_RECEIVER} */
-        case MODE_RECEIVER_SIG: {
             status_ = Q_TRAN(&Radio433_RECEIVING);
             break;
         }

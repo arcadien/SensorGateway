@@ -29,9 +29,8 @@
 #define RADIO433_RX_PIN    9   // 433mhz receiver pin
 #define RADIO433_FACTOR    MAN_9600 // 433mhz default baudrate
 
-// by default, HC5 BT module uses 9600bps,
-// which means 4800 here since mini pro uses a x2 on transmit speed
-#define UART_SPEED        4800
+// by default, HC5 BT module uses 9600bps
+#define UART_SPEED        9600
 #define UART_POWER_CTRL_PIN 10
 
 // How many ms for a BSP tick

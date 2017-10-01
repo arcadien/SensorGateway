@@ -99,7 +99,7 @@ void setup()
     QActive_ctor(&AO_Radio433.super, Q_STATE_CAST(&Radio433_initial));
 
     AO_Led13.m_LedPin = LED13_PIN;
-
+AO_Radio433.m_SpeedFactor = 4; // 4800bps for 433Mhz by default
     pinMode(5, OUTPUT);
 
     pinMode(UART_POWER_CTRL_PIN, OUTPUT);
@@ -243,6 +243,8 @@ void QV_onIdle(void)
     // see the datasheet for your particular AVR MCU.
     SMCR = (0 << SM0) | (1 << SE); // idle mode, adjust to your project
     QV_CPU_SLEEP();  // atomically go to sleep and enable interrupts
+
+
 }
 
 //............................................................................
